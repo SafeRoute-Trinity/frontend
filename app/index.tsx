@@ -1,4 +1,11 @@
-import { Text, View, TouchableOpacity, StyleSheet, ActivityIndicator } from "react-native";
+import React from "react";
+import {
+  ActivityIndicator,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useAuth0 } from "../contexts/Auth0Context";
 
 export default function Index() {
@@ -18,17 +25,17 @@ export default function Index() {
       {isAuthenticated ? (
         <View style={styles.content}>
           <Text style={styles.title}>Welcome Back!</Text>
-          {user?.name && (
+          {user && user.name ? (
             <Text style={styles.userInfo}>Name: {user.name}</Text>
-          )}
-          {user?.email && (
+          ) : null}
+          {user && user.email ? (
             <Text style={styles.userInfo}>Email: {user.email}</Text>
-          )}
-          {user?.picture && (
+          ) : null}
+          {user && user.picture ? (
             <View style={styles.avatarContainer}>
               <Text style={styles.avatarText}>Avatar Set</Text>
             </View>
-          )}
+          ) : null}
           <TouchableOpacity style={styles.logoutButton} onPress={logout}>
             <Text style={styles.buttonText}>Logout</Text>
           </TouchableOpacity>
