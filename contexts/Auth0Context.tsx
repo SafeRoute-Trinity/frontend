@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { auth0 } from '../config/auth0';
+import { getAuth0 } from '../config/auth0';
 
 interface User {
   sub: string;
@@ -118,6 +118,11 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
       setError(null);
       setIsLoading(true);
 
+      const auth0 = getAuth0();
+      if (!auth0) {
+        throw new Error('Auth0 native module is not available. Please rebuild the app with: npx expo prebuild && npx expo run:ios');
+      }
+
       const redirectUri = "saferouteapp://auth/callback";
 
       // Use Auth0 webAuth for login
@@ -158,18 +163,20 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
       setError(null);
       setIsLoading(true);
 
-      // Clear stored tokens
+      // Clear stored tokens and user data
+      // We skip clearSession() to avoid opening a browser window
+      // Clearing local storage is sufficient for logout in mobile apps
       await removeStoredItem(ACCESS_TOKEN_KEY);
       await removeStoredItem(REFRESH_TOKEN_KEY);
       await removeStoredItem(USER_KEY);
 
-      // Clear Auth0 session
-      await auth0.webAuth.clearSession();
-
+      // Clear user state - this will trigger UI update
       setUser(null);
     } catch (err) {
+      // Even if there's an error, try to clear user state
       setError(err as Error);
       console.error('Logout error:', err);
+      setUser(null);
     } finally {
       setIsLoading(false);
     }
