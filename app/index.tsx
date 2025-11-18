@@ -7,6 +7,8 @@ import {
   Text,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
+import { useAuth0 } from "../contexts/Auth0Context";
 
 type ServiceStatusState = "idle" | "checking" | "ok" | "error" | "skipped";
 
@@ -94,9 +96,25 @@ const SERVICES: ServiceDefinition[] = [
 const DEFAULT_TIMEOUT_MS = 8000;
 
 export default function Index() {
+  const router = useRouter();
+  const { isAuthenticated, user, logout, isLoading: authLoading } = useAuth0();
   const [statuses, setStatuses] = useState<Record<string, ServiceStatus>>({});
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      // After logout, the page will automatically refresh/update
+      // because isAuthenticated state changes, showing Login button instead
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
 
   useEffect(() => {
     setStatuses(
@@ -169,10 +187,50 @@ export default function Index() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>SafeRoute Connectivity</Text>
-        <Text style={styles.subtitle}>
-          Quick health snapshot across critical platform services.
-        </Text>
+        <View style={styles.headerTop}>
+          <View style={styles.headerLeft}>
+            <Text style={styles.title}>SafeRoute Connectivity</Text>
+            <Text style={styles.subtitle}>
+              Quick health snapshot across critical platform services.
+            </Text>
+          </View>
+          <View style={styles.authSection}>
+            {isAuthenticated ? (
+              <View style={styles.userInfo}>
+                {user?.name && (
+                  <Text style={styles.userName}>{user.name}</Text>
+                )}
+                <Pressable
+                  onPress={handleLogout}
+                  disabled={isLoggingOut}
+                  style={({ pressed }) => [
+                    styles.authButton,
+                    styles.logoutButton,
+                    isLoggingOut && styles.buttonDisabled,
+                    pressed && !isLoggingOut && styles.buttonPressed,
+                  ]}
+                >
+                  {isLoggingOut ? (
+                    <ActivityIndicator color="#FFFFFF" size="small" />
+                  ) : (
+                    <Text style={styles.authButtonText}>Logout</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.authButton,
+                  styles.loginButton,
+                  pressed && styles.buttonPressed,
+                ]}
+                onPress={() => router.push("/login")}
+              >
+                <Text style={styles.authButtonText}>Login</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
         <Pressable
           accessibilityRole="button"
           disabled={isChecking}
@@ -378,6 +436,46 @@ const styles = StyleSheet.create({
   },
   header: {
     marginBottom: 16,
+  },
+  headerTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 16,
+  },
+  headerLeft: {
+    flex: 1,
+    marginRight: 16,
+  },
+  authSection: {
+    alignItems: "flex-end",
+  },
+  userInfo: {
+    alignItems: "flex-end",
+  },
+  userName: {
+    fontSize: 14,
+    color: "#F8FAFC",
+    marginBottom: 8,
+    fontWeight: "600",
+  },
+  authButton: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  loginButton: {
+    backgroundColor: "#2563EB",
+  },
+  logoutButton: {
+    backgroundColor: "#DC2626",
+  },
+  authButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
   title: {
     fontSize: 28,
