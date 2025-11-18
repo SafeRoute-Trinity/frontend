@@ -7,16 +7,12 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 1. Install dependencies
 
    ```bash
-   npm install
+   pnpm install
    ```
 
 2. Configure environment variables
 
    In `.env` update each URL to point at your deployed or locally running health endpoints. All variables must start with `EXPO_PUBLIC_` so that they are embedded in the Expo bundle.
-
-   ```bash
-   cp .env.example .env
-   ```
 
    - Auth-only services (Auth0, Grafana, Prometheus, Mapbox, API Gateway) can reference their native health endpoints or an authenticated proxy.
    - Non-HTTP infrastructure (PostgreSQL/PostGIS, RabbitMQ, Redis) should expose an HTTP health bridge via your backend microservices. Each bridge route should attempt a lightweight operation (e.g., `SELECT 1`, `PING`, queue inspection) and return `200` on success.
@@ -35,16 +31,6 @@ In the output, you'll find options to open the app in a
 - [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
-```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
 
 ## Learn more
 
