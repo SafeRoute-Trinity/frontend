@@ -1,4 +1,3 @@
-import "dotenv/config";
 import type { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
