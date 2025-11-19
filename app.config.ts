@@ -1,4 +1,3 @@
-import "dotenv/config";
 import type { ExpoConfig } from "expo/config";
 
 const config: ExpoConfig = {
@@ -12,8 +11,14 @@ const config: ExpoConfig = {
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
+    bundleIdentifier: "com.anonymous.saferouteapp",
+    infoPlist: {
+      NSLocationWhenInUseUsageDescription: "This app needs access to your location to show your position on the map.",
+      NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your location in the background to provide continuous tracking.",
+    },
   },
   android: {
+    package: "com.anonymous.saferouteapp",
     adaptiveIcon: {
       backgroundColor: "#E6F4FE",
       foregroundImage: "./assets/images/android-icon-foreground.png",
@@ -41,6 +46,18 @@ const config: ExpoConfig = {
         },
       },
     ],
+    [
+      "@rnmapbox/maps",
+      {
+        RNMapboxMapsDownloadToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "",
+      },
+    ],
+    [
+      "expo-location",
+      {
+        locationAlwaysAndWhenInUsePermission: "Allow SafeRoute to use your location to show your position on the map.",
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,
@@ -56,6 +73,7 @@ const config: ExpoConfig = {
     rabbitmqHealthUrl: process.env.EXPO_PUBLIC_RABBITMQ_HEALTH_URL,
     redisHealthUrl: process.env.EXPO_PUBLIC_REDIS_HEALTH_URL,
     mapboxHealthUrl: process.env.EXPO_PUBLIC_MAPBOX_HEALTH_URL,
+    mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
   },
 };
 
