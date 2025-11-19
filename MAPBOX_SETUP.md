@@ -1,54 +1,54 @@
-# Mapbox 配置说明
+# Mapbox Setup Guide
 
-## 1. 获取 Mapbox Access Token
+## 1. Get Mapbox Access Token
 
-1. 访问 [Mapbox Account](https://account.mapbox.com/)
-2. 登录或注册账号
-3. 在 [Access Tokens](https://account.mapbox.com/access-tokens/) 页面
-4. 创建新的 access token 或使用默认的 token
-5. 复制你的 access token
+1. Visit [Mapbox Account](https://account.mapbox.com/)
+2. Log in or create an account
+3. Go to the [Access Tokens](https://account.mapbox.com/access-tokens/) page
+4. Create a new access token or use the default token
+5. Copy your access token
 
-## 2. 配置 Access Token
+## 2. Configure Access Token
 
-### 方法 1: 使用环境变量（推荐）
+### Method 1: Using Environment Variables (Recommended)
 
-编辑 `.env` 文件（在项目根目录），添加：
+Edit the `.env` file (in the project root directory) and add:
 
 ```env
 EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=your-mapbox-access-token-here
 ```
 
-**注意**: 将 `your-mapbox-access-token-here` 替换为你在 Mapbox 获取的实际 token。
+**Note**: Replace `your-mapbox-access-token-here` with your actual token obtained from Mapbox.
 
-### 方法 2: 直接在配置文件中设置
+### Method 2: Set Directly in Configuration File
 
-如果你不想使用环境变量，可以直接编辑 `config/mapbox.ts` 文件：
+If you don't want to use environment variables, you can directly edit the `config/mapbox.ts` file:
 
 ```typescript
 const MAPBOX_ACCESS_TOKEN = 'your-mapbox-access-token-here';
 ```
 
-## 3. 配置说明
+## 3. Configuration Details
 
-### 当前实现
+### Current Implementation
 
-项目已经配置了两种地图方案：
+The project has been configured with two map solutions:
 
-1. **react-native-maps** (当前使用)
-   - 默认使用 Google Maps
-   - 已安装但需要配置 Google Maps API key（如果使用 Google Maps）
-   - 或者可以切换到 Mapbox 样式
+1. **react-native-maps** (Currently in use)
+   - Default uses Google Maps
+   - Already installed but requires Google Maps API key configuration (if using Google Maps)
+   - Or can switch to Mapbox style
 
-2. **@rnmapbox/maps** (已安装，可选)
-   - 真正的 Mapbox SDK
-   - 需要 Mapbox access token
-   - 需要运行 `npx expo prebuild` 来配置原生代码
+2. **@rnmapbox/maps** (Installed, optional)
+   - True Mapbox SDK
+   - Requires Mapbox access token
+   - Requires running `npx expo prebuild` to configure native code
 
-### 使用 react-native-maps (当前方案)
+### Using react-native-maps (Current Solution)
 
-如果你继续使用 `react-native-maps`，需要配置 Google Maps API key：
+If you continue using `react-native-maps`, you need to configure Google Maps API key:
 
-在 `app.config.ts` 中添加：
+Add to `app.config.ts`:
 
 ```typescript
 ios: {
@@ -63,48 +63,46 @@ android: {
 },
 ```
 
-然后在 `.env` 文件中添加：
+Then add to the `.env` file:
 ```env
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 ```
 
-### 使用 @rnmapbox/maps (推荐，真正的 Mapbox)
+### Using @rnmapbox/maps (Recommended, True Mapbox)
 
-如果你要使用真正的 Mapbox SDK：
+If you want to use the true Mapbox SDK:
 
-1. 确保已配置 `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` 在 `.env` 文件中
-2. 运行 `npx expo prebuild` 生成原生配置
-3. 更新代码使用 `@rnmapbox/maps` 组件
+1. Ensure `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` is configured in the `.env` file
+2. Run `npx expo prebuild` to generate native configuration
+3. Update code to use `@rnmapbox/maps` components
 
-## 4. 验证配置
+## 4. Verify Configuration
 
-配置完成后：
+After configuration:
 
-1. 重启 Expo 开发服务器：`npx expo start --clear`
-2. 如果使用原生 Mapbox，需要重新构建应用：
+1. Restart the Expo development server: `npx expo start --clear`
+2. If using native Mapbox, you need to rebuild the app:
    ```bash
    npx expo prebuild
    npx expo run:ios
-   # 或
+   # or
    npx expo run:android
    ```
 
-## 5. 故障排除
+## 5. Troubleshooting
 
-### Token 未生效
-- 确保环境变量以 `EXPO_PUBLIC_` 开头
-- 重启 Expo 开发服务器
-- 对于生产构建，需要重新构建应用
+### Token Not Working
+- Ensure environment variables start with `EXPO_PUBLIC_`
+- Restart the Expo development server
+- For production builds, you need to rebuild the app
 
-### 地图不显示
-- 检查 access token 是否正确
-- 检查网络连接
-- 查看控制台错误信息
+### Map Not Displaying
+- Check if the access token is correct
+- Check network connection
+- Check console error messages
 
-## 获取 Access Token 的链接
+## Links to Get Access Token
 
 - [Mapbox Account](https://account.mapbox.com/)
-- [Access Tokens 页面](https://account.mapbox.com/access-tokens/)
-- [Mapbox 文档](https://docs.mapbox.com/)
-
-
+- [Access Tokens Page](https://account.mapbox.com/access-tokens/)
+- [Mapbox Documentation](https://docs.mapbox.com/)
