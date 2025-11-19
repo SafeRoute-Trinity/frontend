@@ -17,35 +17,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "20"
+          cache: 'pnpm'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
 
       - name: Install dependencies
-        run: |
-          if [ -f "yarn.lock" ]; then
-            yarn install --frozen-lockfile
-          else
-            npm ci
-          fi
+        run: pnpm install --frozen-lockfile
 
-      - name: Type check (if script exists)
-        run: |
-          if npm run | grep -q "tsc"; then
-            npm run tsc -- --noEmit
-          else
-            echo "No tsc script, skipping type-check"
-          fi
+      - name: Type check
+        run: pnpm exec tsc --noEmit
 
       - name: Run tests (if script exists)
         run: |
-          if npm run | grep -q "test"; then
-            npm test
+          if pnpm run | grep -q "test"; then
+            pnpm test
           else
             echo "No test script, skipping tests"
           fi
 
-      - name: Lint (if script exists)
-        run: |
-          if npm run | grep -q "lint"; then
-            npm run lint
-          else
-            echo "No lint script, skipping lint"
-          fi
+      - name: Lint
+        run: pnpm lint
