@@ -1,575 +1,623 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { useEffect, useState, useRef } from "react";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View, FlatList } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth0 } from "../contexts/Auth0Context";
+import * as Location from "expo-location";
+import Mapbox, { Camera, PointAnnotation } from "@rnmapbox/maps";
 
-type ServiceStatusState = "idle" | "checking" | "ok" | "error" | "skipped";
+// Initialize Mapbox with access token
+const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+if (MAPBOX_ACCESS_TOKEN) {
+  Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
+}
 
-type ServiceStatus = {
-  state: ServiceStatusState;
-  error?: string;
-};
+interface LocationData {
+  latitude: number;
+  longitude: number;
+}
 
-type ServiceDefinition = {
+interface SearchResult {
   id: string;
-  name: string;
-  description: string;
-  url?: string;
-  method?: string;
-  headers?: Record<string, string>;
-  timeoutMs?: number;
-  requiresProxy?: boolean;
-};
-
-const SERVICES: ServiceDefinition[] = [
-  {
-    id: "auth0",
-    name: "Auth0",
-    description: "Checks Auth0 tenant availability",
-    url: process.env.EXPO_PUBLIC_AUTH0_HEALTH_URL,
-  },
-  {
-    id: "api-gateway",
-    name: "API Gateway",
-    description: "Verifies the primary API gateway health endpoint",
-    url: process.env.EXPO_PUBLIC_API_HEALTH_URL,
-  },
-  {
-    id: "grafana",
-    name: "Grafana",
-    description: "Verifies Grafana instance is reachable",
-    url: process.env.EXPO_PUBLIC_GRAFANA_HEALTH_URL,
-  },
-  {
-    id: "prometheus",
-    name: "Prometheus",
-    description: "Checks Prometheus metrics endpoint",
-    url: process.env.EXPO_PUBLIC_PROMETHEUS_HEALTH_URL,
-  },
-  {
-    id: "postgres",
-    name: "PostgreSQL",
-    description:
-      "Requires a backend-provided health endpoint that confirms DB connectivity",
-    url: process.env.EXPO_PUBLIC_POSTGRES_HEALTH_URL,
-    requiresProxy: true,
-  },
-  {
-    id: "postgis",
-    name: "PostGIS",
-    description:
-      "Requires backend verification that PostGIS extensions are enabled",
-    url: process.env.EXPO_PUBLIC_POSTGIS_HEALTH_URL,
-    requiresProxy: true,
-  },
-  {
-    id: "mapbox",
-    name: "Mapbox",
-    description: "Checks Mapbox SDK/token via a lightweight REST call",
-    url: process.env.EXPO_PUBLIC_MAPBOX_HEALTH_URL,
-  },
-  {
-    id: "rabbitmq",
-    name: "RabbitMQ",
-    description:
-      "Needs a backend health bridge that confirms the broker connection",
-    url: process.env.EXPO_PUBLIC_RABBITMQ_HEALTH_URL,
-    requiresProxy: true,
-  },
-  {
-    id: "redis",
-    name: "Redis",
-    description:
-      "Needs a backend health bridge that checks the cache connectivity",
-    url: process.env.EXPO_PUBLIC_REDIS_HEALTH_URL,
-    requiresProxy: true,
-  },
-];
-
-const DEFAULT_TIMEOUT_MS = 8000;
+  place_name: string;
+  center: [number, number]; // [longitude, latitude]
+}
 
 export default function Index() {
   const router = useRouter();
-  const { isAuthenticated, user, logout, isLoading: authLoading } = useAuth0();
-  const [statuses, setStatuses] = useState<Record<string, ServiceStatus>>({});
-  const [isChecking, setIsChecking] = useState(false);
-  const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const { isAuthenticated, user } = useAuth0();
+  const [location, setLocation] = useState<LocationData | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(true);
+  const [zoomLevel, setZoomLevel] = useState(15);
+  const [longPressProgress, setLongPressProgress] = useState(0);
+  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressStartTimeRef = useRef<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const handleLogout = async () => {
+  const MIN_ZOOM = 3;
+  const MAX_ZOOM = 20;
+  const ZOOM_STEP = 1;
+  const LONG_PRESS_DURATION = 5000; // 5 seconds
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setIsLoadingLocation(true);
+        setLocationError(null);
+
+        // Request location permissions
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          setLocationError("Location permission denied");
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        // Get current location
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        setLocation({
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+        });
+      } catch (error) {
+        console.error("Error getting location:", error);
+        setLocationError("Failed to get location");
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    })();
+  }, []);
+
+
+  const handleZoomIn = () => {
+    const newZoom = Math.min(zoomLevel + ZOOM_STEP, MAX_ZOOM);
+    setZoomLevel(newZoom);
+  };
+
+  const handleZoomOut = () => {
+    const newZoom = Math.max(zoomLevel - ZOOM_STEP, MIN_ZOOM);
+    setZoomLevel(newZoom);
+  };
+
+  const handleLongPressStart = () => {
+    longPressStartTimeRef.current = Date.now();
+    setLongPressProgress(0);
+
+    // Update progress every 100ms
+    longPressTimerRef.current = setInterval(() => {
+      if (longPressStartTimeRef.current) {
+        const elapsed = Date.now() - longPressStartTimeRef.current;
+        const progress = Math.min((elapsed / LONG_PRESS_DURATION) * 100, 100);
+        setLongPressProgress(progress);
+
+        if (elapsed >= LONG_PRESS_DURATION) {
+          // Navigate to health page
+          router.push("/health");
+          handleLongPressEnd();
+        }
+      }
+    }, 100);
+  };
+
+  const handleLongPressEnd = () => {
+    if (longPressTimerRef.current) {
+      clearInterval(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+    longPressStartTimeRef.current = null;
+    setLongPressProgress(0);
+  };
+
+  // Search for places using Mapbox Geocoding API
+  const searchPlaces = async (query: string) => {
+    if (!query.trim() || !MAPBOX_ACCESS_TOKEN) {
+      setSearchResults([]);
+      return;
+    }
+
     try {
-      setIsLoggingOut(true);
-      await logout();
-      // After logout, the page will automatically refresh/update
-      // because isAuthenticated state changes, showing Login button instead
+      setIsSearching(true);
+      const encodedQuery = encodeURIComponent(query);
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=5`;
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      if (data.features) {
+        setSearchResults(data.features.map((feature: any) => ({
+          id: feature.id,
+          place_name: feature.place_name,
+          center: feature.center,
+        })));
+      }
     } catch (error) {
-      console.error("Logout failed:", error);
+      console.error("Search error:", error);
+      setSearchResults([]);
     } finally {
-      setIsLoggingOut(false);
+      setIsSearching(false);
     }
   };
 
+  // Handle search input with debounce
   useEffect(() => {
-    setStatuses(
-      SERVICES.reduce<Record<string, ServiceStatus>>((acc, service) => {
-        acc[service.id] = { state: service.url ? "idle" : "skipped" };
-        return acc;
-      }, {}),
-    );
-  }, []);
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
 
-  const pendingChecks = useMemo(
-    () => SERVICES.filter((service) => service.url),
-    [],
-  );
+    searchTimeoutRef.current = setTimeout(() => {
+      searchPlaces(searchQuery);
+    }, 500); // 500ms debounce
 
-  const handleCheckAll = useCallback(async () => {
-    setIsChecking(true);
-    setStatuses((prev) => {
-      const next = { ...prev };
-      for (const service of SERVICES) {
-        next[service.id] = service.url
-          ? { state: "checking" }
-          : {
-              state: "skipped",
-              error: "Missing EXPO_PUBLIC_* env for this check",
-            };
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
-      return next;
-    });
+    };
+  }, [searchQuery]);
 
-    try {
-      const results = await Promise.all(
-        SERVICES.map(async (service) => {
-          if (!service.url) {
-            return {
-              id: service.id,
-              status: {
-                state: "skipped" as ServiceStatusState,
-                error: "Missing EXPO_PUBLIC_* env for this check",
-              },
-            };
-          }
+  // Handle location selection
+  const handleSelectLocation = (result: SearchResult) => {
+    const [longitude, latitude] = result.center;
+    setSelectedLocation({ latitude, longitude });
+    setZoomLevel(15);
+    setSearchQuery("");
+    setSearchResults([]);
+  };
 
-          const status = await checkHttpService(service);
-          return { id: service.id, status };
-        }),
-      );
-
-      setStatuses((prev) => {
-        const next = { ...prev };
-        for (const result of results) {
-          next[result.id] = result.status;
-        }
-        return next;
-      });
-      setLastCheckedAt(new Date());
-    } finally {
-      setIsChecking(false);
-    }
-  }, []);
-
+  // Cleanup on unmount
   useEffect(() => {
-    if (pendingChecks.length > 0) {
-      handleCheckAll().catch(() => {
-        // errors handled per-service; this catch prevents unhandled rejections
-      });
-    }
-  }, [handleCheckAll, pendingChecks.length]);
+    return () => {
+      if (longPressTimerRef.current) {
+        clearInterval(longPressTimerRef.current);
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <View style={styles.headerTop}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.title}>SafeRoute Connectivity</Text>
-            <Text style={styles.subtitle}>
-              Quick health snapshot across critical platform services.
-            </Text>
+      {/* Full Screen Map */}
+      <View style={styles.mapContainer}>
+        {isLoadingLocation ? (
+          <View style={styles.mapPlaceholder}>
+            <ActivityIndicator size="large" color="#2563EB" />
+            <Text style={styles.mapPlaceholderText}>Loading map...</Text>
           </View>
-          <View style={styles.authSection}>
-            {isAuthenticated ? (
-              <View style={styles.userInfo}>
-                {user?.name && (
-                  <Text style={styles.userName}>{user.name}</Text>
-                )}
-                <Pressable
-                  onPress={handleLogout}
-                  disabled={isLoggingOut}
-                  style={({ pressed }) => [
-                    styles.authButton,
-                    styles.logoutButton,
-                    isLoggingOut && styles.buttonDisabled,
-                    pressed && !isLoggingOut && styles.buttonPressed,
-                  ]}
-                >
-                  {isLoggingOut ? (
-                    <ActivityIndicator color="#FFFFFF" size="small" />
-                  ) : (
-                    <Text style={styles.authButtonText}>Logout</Text>
-                  )}
-                </Pressable>
+        ) : locationError ? (
+          <View style={styles.mapPlaceholder}>
+            <Text style={styles.mapErrorText}>{locationError}</Text>
+          </View>
+        ) : location ? (
+          <Mapbox.MapView
+            style={styles.map}
+            styleURL={Mapbox.StyleURL.Dark}
+            logoEnabled={false}
+            attributionEnabled={false}
+            zoomEnabled={true}
+            scrollEnabled={true}
+            pitchEnabled={true}
+            rotateEnabled={true}
+            compassEnabled={true}
+            scaleBarEnabled={true}
+            scaleBarPosition={{ bottom: 20, left: 20 }}
+          >
+            <Camera
+              zoomLevel={zoomLevel}
+              centerCoordinate={
+                selectedLocation
+                  ? [selectedLocation.longitude, selectedLocation.latitude]
+                  : [location.longitude, location.latitude]
+              }
+              animationMode="easeTo"
+              animationDuration={200}
+              minZoomLevel={MIN_ZOOM}
+              maxZoomLevel={MAX_ZOOM}
+            />
+            <Mapbox.UserLocation visible={true} />
+            <PointAnnotation
+              id="user-location"
+              coordinate={[location.longitude, location.latitude]}
+              title="Your Location"
+            >
+              <View style={styles.markerContainer}>
+                <View style={styles.marker} />
               </View>
-            ) : (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.authButton,
-                  styles.loginButton,
-                  pressed && styles.buttonPressed,
-                ]}
-                onPress={() => router.push("/login")}
+            </PointAnnotation>
+            {selectedLocation && (
+              <PointAnnotation
+                id="selected-location"
+                coordinate={[selectedLocation.longitude, selectedLocation.latitude]}
+                title="Selected Location"
               >
-                <Text style={styles.authButtonText}>Login</Text>
-              </Pressable>
+                <View style={styles.markerContainer}>
+                  <View style={styles.selectedMarker} />
+                </View>
+              </PointAnnotation>
             )}
-          </View>
-        </View>
+          </Mapbox.MapView>
+        ) : null}
+      </View>
+
+      {/* Top Header */}
+      <View style={styles.topHeader}>
         <Pressable
-          accessibilityRole="button"
-          disabled={isChecking}
-          onPress={handleCheckAll}
-          style={({ pressed }) => [
-            styles.button,
-            isChecking && styles.buttonDisabled,
-            pressed && !isChecking && styles.buttonPressed,
-          ]}
+          onPressIn={handleLongPressStart}
+          onPressOut={handleLongPressEnd}
+          style={styles.topHeaderPressable}
         >
-          {isChecking ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>Run health checks</Text>
+          <Text style={styles.topHeaderTitle}>SafeRoute</Text>
+          {longPressProgress > 0 && (
+            <View style={styles.progressBarContainer}>
+              <View style={[styles.progressBar, { width: `${longPressProgress}%` }]} />
+            </View>
           )}
         </Pressable>
-        <Text style={styles.summary}>
-          {formatSummary(statuses, isChecking)}
-        </Text>
-        {lastCheckedAt ? (
-          <Text style={styles.lastChecked}>
-            Last checked: {lastCheckedAt.toLocaleTimeString()}
-          </Text>
-        ) : (
-          <Text style={styles.lastChecked}>
-            Configure the EXPO_PUBLIC_* environment variables to enable checks.
-          </Text>
+      </View>
+
+      {/* Search Box */}
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for a place..."
+            placeholderTextColor="#9CA3AF"
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          {isSearching && (
+            <ActivityIndicator size="small" color="#2563EB" style={styles.searchLoader} />
+          )}
+        </View>
+        {searchResults.length > 0 && (
+          <View style={styles.searchResultsContainer}>
+            <FlatList
+              data={searchResults}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <Pressable
+                  style={styles.searchResultItem}
+                  onPress={() => handleSelectLocation(item)}
+                >
+                  <Text style={styles.searchResultText}>{item.place_name}</Text>
+                </Pressable>
+              )}
+              style={styles.searchResultsList}
+            />
+          </View>
         )}
       </View>
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {SERVICES.map((service) => {
-          const status = statuses[service.id] ?? { state: "idle" };
-          return (
-            <View key={service.id} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{service.name}</Text>
-                <StatusBadge status={status.state} />
+
+      {/* User Avatar */}
+      <View style={styles.avatarContainer}>
+        {isAuthenticated && user ? (
+          <Pressable
+            onPress={() => router.push("/profile")}
+            style={styles.avatarButton}
+          >
+            {user.picture ? (
+              <Image
+                source={{ uri: user.picture }}
+                style={styles.avatarImage}
+              />
+            ) : (
+              <View style={styles.avatarPlaceholder}>
+                <Text style={styles.avatarPlaceholderText}>
+                  {user.name?.charAt(0).toUpperCase() || "U"}
+                </Text>
               </View>
-              <Text style={styles.cardDescription}>{service.description}</Text>
-              {service.requiresProxy && (
-                <Text style={styles.cardNote}>
-                  Requires backend health endpoint (HTTP) that encapsulates the
-                  non-HTTP service.
-                </Text>
-              )}
-              {service.url ? (
-                <Text style={styles.cardEndpoint}>{service.url}</Text>
-              ) : (
-                <Text style={styles.cardMissing}>
-                  {`Set EXPO_PUBLIC_${service.id
-                    .toUpperCase()
-                    .replace(/-/g, "_")}_HEALTH_URL in your Expo config to enable this check.`}
-                </Text>
-              )}
-              {status.state === "error" && status.error && (
-                <Text style={styles.cardError}>{status.error}</Text>
-              )}
-              {status.state === "skipped" && status.error && (
-                <Text style={styles.cardNote}>{status.error}</Text>
-              )}
-            </View>
-          );
-        })}
-      </ScrollView>
+            )}
+          </Pressable>
+        ) : (
+          <Pressable
+            style={({ pressed }) => [
+              styles.loginAvatarButton,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => router.push("/login")}
+          >
+            <Text style={styles.loginAvatarText}>Login</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Zoom Controls */}
+      {location && (
+        <View style={styles.zoomControls}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.zoomButton,
+              pressed && styles.zoomButtonPressed,
+              zoomLevel >= MAX_ZOOM && styles.zoomButtonDisabled,
+            ]}
+            onPress={handleZoomIn}
+            disabled={zoomLevel >= MAX_ZOOM}
+          >
+            <Text style={styles.zoomButtonText}>+</Text>
+          </Pressable>
+          <View style={styles.zoomDivider} />
+          <Pressable
+            style={({ pressed }) => [
+              styles.zoomButton,
+              pressed && styles.zoomButtonPressed,
+              zoomLevel <= MIN_ZOOM && styles.zoomButtonDisabled,
+            ]}
+            onPress={handleZoomOut}
+            disabled={zoomLevel <= MIN_ZOOM}
+          >
+            <Text style={styles.zoomButtonText}>−</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
-
-function StatusBadge({ status }: { status: ServiceStatusState }) {
-  const label = STATUS_LABELS[status];
-  return (
-    <View style={[styles.badge, { backgroundColor: STATUS_COLORS[status] }]}>
-      <Text style={styles.badgeText}>{label}</Text>
-    </View>
-  );
-}
-
-async function checkHttpService(
-  service: ServiceDefinition,
-): Promise<ServiceStatus> {
-  try {
-    const response = await fetchWithTimeout(
-      service.url!,
-      {
-        method: service.method ?? "GET",
-        headers: {
-          Accept: "application/json",
-          ...(service.headers ?? {}),
-        },
-      },
-      service.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    );
-
-    if (!response.ok) {
-      const bodyPreview = await safeReadText(response);
-      throw new Error(
-        `HTTP ${response.status}${
-          bodyPreview ? ` – ${truncate(bodyPreview, 120)}` : ""
-        }`,
-      );
-    }
-
-    return { state: "ok" };
-  } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Unexpected error occurred";
-    return { state: "error", error: message };
-  }
-}
-
-function fetchWithTimeout(
-  url: string,
-  options: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  return new Promise((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error(`Timed out after ${timeoutMs} ms`));
-    }, timeoutMs);
-
-    fetch(url, options)
-      .then((response) => {
-        clearTimeout(timeoutId);
-        resolve(response);
-      })
-      .catch((error) => {
-        clearTimeout(timeoutId);
-        reject(error);
-      });
-  });
-}
-
-async function safeReadText(response: Response) {
-  try {
-    return await response.text();
-  } catch {
-    return "";
-  }
-}
-
-function truncate(value: string, maxLength: number) {
-  return value.length > maxLength
-    ? `${value.slice(0, maxLength - 1)}…`
-    : value;
-}
-
-function formatSummary(
-  statuses: Record<string, ServiceStatus>,
-  isChecking: boolean,
-) {
-  if (isChecking) {
-    return "Running checks…";
-  }
-
-  const total = Object.keys(statuses).length;
-
-  if (!total) {
-    return "Awaiting health check configuration.";
-  }
-
-  const counts = Object.values(statuses).reduce(
-    (acc, status) => {
-      acc[status.state] = (acc[status.state] ?? 0) + 1;
-      return acc;
-    },
-    {} as Record<ServiceStatusState, number>,
-  );
-
-  return [
-    counts.ok ? `${counts.ok} OK` : "",
-    counts.error ? `${counts.error} error` : "",
-    counts.skipped ? `${counts.skipped} skipped` : "",
-  ]
-    .filter(Boolean)
-    .join(" · ");
-}
-
-const STATUS_LABELS: Record<ServiceStatusState, string> = {
-  idle: "Idle",
-  checking: "Checking",
-  ok: "OK",
-  error: "Error",
-  skipped: "Skipped",
-};
-
-const STATUS_COLORS: Record<ServiceStatusState, string> = {
-  idle: "#9CA3AF",
-  checking: "#2563EB",
-  ok: "#16A34A",
-  error: "#DC2626",
-  skipped: "#6B7280",
-};
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#0F172A",
-    paddingHorizontal: 20,
-    paddingVertical: 32,
   },
-  header: {
-    marginBottom: 16,
-  },
-  headerTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 16,
-  },
-  headerLeft: {
+  mapContainer: {
+    ...StyleSheet.absoluteFillObject,
     flex: 1,
-    marginRight: 16,
   },
-  authSection: {
-    alignItems: "flex-end",
+  map: {
+    flex: 1,
   },
-  userInfo: {
-    alignItems: "flex-end",
+  mapPlaceholder: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "#1E293B",
   },
-  userName: {
+  mapPlaceholderText: {
+    color: "#CBD5F5",
     fontSize: 14,
-    color: "#F8FAFC",
-    marginBottom: 8,
-    fontWeight: "600",
+    marginTop: 8,
   },
-  authButton: {
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    minWidth: 80,
+  mapErrorText: {
+    color: "#F87171",
+    fontSize: 14,
+    textAlign: "center",
+    padding: 16,
+  },
+  avatarContainer: {
+    position: "absolute",
+    top: 110,
+    right: 16,
+    zIndex: 1001,
+  },
+  avatarButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  avatarImage: {
+    width: "100%",
+    height: "100%",
+  },
+  avatarPlaceholder: {
+    width: "100%",
+    height: "100%",
+    backgroundColor: "#2563EB",
+    justifyContent: "center",
     alignItems: "center",
   },
-  loginButton: {
-    backgroundColor: "#2563EB",
-  },
-  logoutButton: {
-    backgroundColor: "#DC2626",
-  },
-  authButtonText: {
-    color: "#FFFFFF",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  title: {
-    fontSize: 28,
+  avatarPlaceholderText: {
+    fontSize: 20,
     fontWeight: "700",
-    color: "#F8FAFC",
-    marginBottom: 4,
+    color: "#FFFFFF",
   },
-  subtitle: {
-    fontSize: 16,
-    color: "#CBD5F5",
-    marginBottom: 16,
-  },
-  button: {
+  loginAvatarButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     backgroundColor: "#2563EB",
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 18,
-    alignSelf: "flex-start",
-    marginBottom: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loginAvatarText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "600",
   },
   buttonPressed: {
     opacity: 0.85,
   },
-  buttonDisabled: {
-    backgroundColor: "#1D4ED8",
+  markerContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 30,
+    height: 30,
   },
-  buttonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+  marker: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#2563EB",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
+  selectedMarker: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "#059669",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+  },
+  zoomControls: {
+    position: "absolute",
+    right: 16,
+    bottom: 100,
+    zIndex: 1000,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 8,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  zoomButton: {
+    width: 48,
+    height: 48,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+  },
+  zoomButtonPressed: {
+    backgroundColor: "rgba(240, 240, 240, 0.95)",
+  },
+  zoomButtonDisabled: {
+    opacity: 0.4,
+  },
+  zoomButtonText: {
+    fontSize: 24,
     fontWeight: "600",
+    color: "#1F2937",
+    lineHeight: 28,
   },
-  summary: {
-    color: "#E2E8F0",
-    fontSize: 14,
-    marginBottom: 4,
+  zoomDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
   },
-  lastChecked: {
-    color: "#94A3B8",
-    fontSize: 12,
+  topHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    backgroundColor: "transparent",
+    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+    alignItems: "center",
   },
-  scrollContent: {
-    paddingBottom: 32,
+  topHeaderPressable: {
+    alignItems: "center",
+    width: "100%",
   },
-  card: {
-    backgroundColor: "#1E293B",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+  topHeaderTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    color: "#FFFFFF",
+    textShadowColor: "rgba(0, 0, 0, 0.5)",
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
   },
-  cardHeader: {
+  progressBarContainer: {
+    marginTop: 8,
+    width: 150,
+    height: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  progressBar: {
+    height: "100%",
+    backgroundColor: "#2563EB",
+    borderRadius: 2,
+  },
+  searchContainer: {
+    position: "absolute",
+    top: 110,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+  },
+  searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 6,
-  },
-  cardTitle: {
-    color: "#F8FAFC",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  cardDescription: {
-    color: "#CBD5F5",
-    fontSize: 14,
-    marginBottom: 6,
-  },
-  cardNote: {
-    color: "#FACC15",
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  cardEndpoint: {
-    color: "#38BDF8",
-    fontSize: 12,
-    marginBottom: 6,
-    fontFamily: "monospace",
-  },
-  cardMissing: {
-    color: "#F87171",
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  cardError: {
-    color: "#F87171",
-    fontSize: 12,
-  },
-  badge: {
-    borderRadius: 9999,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 12,
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 10,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
-  badgeText: {
-    color: "#0F172A",
-    fontSize: 12,
-    fontWeight: "700",
+  searchIcon: {
+    fontSize: 18,
+    marginRight: 8,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: "#1F2937",
+    padding: 0,
+  },
+  searchLoader: {
+    marginLeft: 8,
+  },
+  searchResultsContainer: {
+    marginTop: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    borderRadius: 12,
+    maxHeight: 200,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    overflow: "hidden",
+  },
+  searchResultsList: {
+    maxHeight: 200,
+  },
+  searchResultItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E7EB",
+  },
+  searchResultText: {
+    fontSize: 14,
+    color: "#1F2937",
   },
 });
-

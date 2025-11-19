@@ -10,7 +10,11 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.anonymous.saferouteapp"
+      "bundleIdentifier": "com.anonymous.saferouteapp",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app needs access to your location to show your position on the map.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "This app uses your location in the background to provide continuous tracking."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -39,6 +43,12 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow SafeRoute to use your location to show your position on the map."
         }
       ]
     ],
