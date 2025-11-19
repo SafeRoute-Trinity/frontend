@@ -30,13 +30,13 @@ export default function Index() {
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [zoomLevel, setZoomLevel] = useState(15);
   const [longPressProgress, setLongPressProgress] = useState(0);
-  const longPressTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const longPressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const longPressStartTimeRef = useRef<number | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
-  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
