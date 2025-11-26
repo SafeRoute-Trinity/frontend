@@ -15,8 +15,9 @@ interface Auth0ContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
-  login: () => Promise<void>;
+  login: (showSignup?: boolean, forceLogin?: boolean) => Promise<void>;
   logout: () => Promise<void>;
+  clearSession: () => Promise<void>;
   error: Error | null;
 }
 
@@ -113,7 +114,7 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-  const login = async () => {
+  const login = async (showSignup: boolean = false, forceLogin: boolean = false) => {
     try {
       setError(null);
       setIsLoading(true);
@@ -125,11 +126,16 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
 
       const redirectUri = "saferouteapp://auth/callback";
 
-      // Use Auth0 webAuth for login
+      // Use Auth0 webAuth for login or signup
       const credentials = await auth0.webAuth.authorize({
         // Type definitions don't include redirectUri, but the runtime library expects it.
         // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
-        ...( { scope: 'openid profile email offline_access', redirectUri } as any ),
+        ...( {
+          scope: 'openid profile email offline_access',
+          redirectUri,
+          ...(showSignup ? { screen_hint: 'signup' } : {}),
+          ...(forceLogin ? { prompt: 'login' } : {})
+        } as any ),
       });
 
       // Save tokens
@@ -158,14 +164,26 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
     }
   };
 
+  const clearSession = async () => {
+    try {
+      const auth0 = getAuth0();
+      if (auth0) {
+        await auth0.webAuth.clearSession();
+      }
+    } catch (err) {
+      console.error('Clear session error:', err);
+    }
+  };
+
   const logout = async () => {
     try {
       setError(null);
       setIsLoading(true);
 
+      // Clear Auth0 session
+      await clearSession();
+
       // Clear stored tokens and user data
-      // We skip clearSession() to avoid opening a browser window
-      // Clearing local storage is sufficient for logout in mobile apps
       await removeStoredItem(ACCESS_TOKEN_KEY);
       await removeStoredItem(REFRESH_TOKEN_KEY);
       await removeStoredItem(USER_KEY);
@@ -188,6 +206,7 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
     isAuthenticated: !!user,
     login,
     logout,
+    clearSession,
     error,
   };
 

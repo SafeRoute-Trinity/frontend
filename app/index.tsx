@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View, FlatList } from "react-native";
+import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View, FlatList, Modal, TouchableOpacity } from "react-native";
 import { useRouter } from "expo-router";
 import { useAuth0 } from "../contexts/Auth0Context";
 import * as Location from "expo-location";
@@ -24,7 +24,7 @@ interface SearchResult {
 
 export default function Index() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth0();
+  const { isAuthenticated, user, logout } = useAuth0();
   const [location, setLocation] = useState<LocationData | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
@@ -37,6 +37,8 @@ export default function Index() {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
@@ -171,6 +173,38 @@ export default function Index() {
     setSearchResults([]);
   };
 
+  // Handle logout
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      setShowAccountMenu(false);
+      router.push("/");
+    } catch (error) {
+      console.error("Logout failed:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Handle switch account
+  const handleSwitchAccount = async () => {
+    try {
+      setIsLoggingOut(true);
+      setShowAccountMenu(false);
+
+      // Clear local storage and Auth0 session
+      await logout();
+
+      // Navigate to login and force show login form
+      router.push("/login?forceLogin=true");
+    } catch (error) {
+      console.error("Switch account failed:", error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
   // Cleanup on unmount
   useEffect(() => {
     return () => {
@@ -303,7 +337,7 @@ export default function Index() {
       <View style={styles.avatarContainer}>
         {isAuthenticated && user ? (
           <Pressable
-            onPress={() => router.push("/profile")}
+            onPress={() => setShowAccountMenu(true)}
             style={styles.avatarButton}
           >
             {user.picture ? (
@@ -331,6 +365,64 @@ export default function Index() {
           </Pressable>
         )}
       </View>
+
+      {/* Account Menu Modal */}
+      <Modal
+        visible={showAccountMenu}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowAccountMenu(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowAccountMenu(false)}
+        >
+          <View style={styles.menuContainer}>
+            <Pressable
+              style={({ pressed }) => [
+                styles.menuItem,
+                pressed && styles.menuItemPressed,
+              ]}
+              onPress={() => {
+                setShowAccountMenu(false);
+                router.push("/profile");
+              }}
+            >
+              <Text style={styles.menuItemIcon}>👤</Text>
+              <Text style={styles.menuItemText}>View Profile</Text>
+            </Pressable>
+            <View style={styles.menuDivider} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.menuItem,
+                pressed && styles.menuItemPressed,
+              ]}
+              onPress={handleSwitchAccount}
+              disabled={isLoggingOut}
+            >
+              <Text style={styles.menuItemIcon}>🔄</Text>
+              <Text style={styles.menuItemText}>
+                {isLoggingOut ? "Switching..." : "Switch Account"}
+              </Text>
+            </Pressable>
+            <View style={styles.menuDivider} />
+            <Pressable
+              style={({ pressed }) => [
+                styles.menuItem,
+                pressed && styles.menuItemPressed,
+              ]}
+              onPress={handleLogout}
+              disabled={isLoggingOut}
+            >
+              <Text style={styles.menuItemIcon}>🚪</Text>
+              <Text style={[styles.menuItemText, styles.logoutText]}>
+                {isLoggingOut ? "Logging out..." : "Logout"}
+              </Text>
+            </Pressable>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {/* Zoom Controls */}
       {location && (
@@ -399,6 +491,11 @@ const styles = StyleSheet.create({
     right: 16,
     zIndex: 1001,
   },
+  avatarWithMenu: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
   avatarButton: {
     width: 50,
     height: 50,
@@ -414,6 +511,28 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  menuButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  menuIcon: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#1F2937",
+    lineHeight: 20,
   },
   avatarImage: {
     width: "100%",
@@ -619,5 +738,52 @@ const styles = StyleSheet.create({
   searchResultText: {
     fontSize: 14,
     color: "#1F2937",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-start",
+    alignItems: "flex-end",
+    paddingTop: 110,
+    paddingRight: 16,
+  },
+  menuContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    minWidth: 200,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    elevation: 8,
+    overflow: "hidden",
+  },
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+  },
+  menuItemPressed: {
+    backgroundColor: "#F3F4F6",
+  },
+  menuItemIcon: {
+    fontSize: 18,
+  },
+  menuItemText: {
+    fontSize: 16,
+    color: "#1F2937",
+    fontWeight: "500",
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: "#E5E7EB",
+  },
+  logoutText: {
+    color: "#DC2626",
   },
 });
