@@ -1,21 +1,30 @@
 import { useEffect, useState } from "react";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { useAuth0 } from "../contexts/Auth0Context";
 
 export default function Login() {
   const { login, logout, isLoading, error, isAuthenticated, user } = useAuth0();
   const router = useRouter();
+  const params = useLocalSearchParams();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  // Check if we should force login (e.g., when switching accounts)
+  const shouldForceLogin = params.forceLogin === "true";
 
   const handleLogin = async () => {
     try {
-      await login();
+      await login(false, shouldForceLogin);
       // Navigation will happen automatically when isAuthenticated changes
     } catch (err) {
       // Error is handled by the context
       console.error("Login failed:", err);
     }
+  };
+
+  const handleRegister = () => {
+    // Navigate to custom registration page
+    router.push("/register");
   };
 
   // Navigate to home when authentication succeeds
@@ -113,6 +122,33 @@ export default function Login() {
             <Text style={styles.primaryButtonText}>Login</Text>
           )}
         </Pressable>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            styles.registerButton,
+            (isLoading || isAuthenticated) && styles.buttonDisabled,
+            pressed && !isLoading && !isAuthenticated && styles.buttonPressed,
+          ]}
+          onPress={handleRegister}
+          disabled={isLoading || isAuthenticated}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#2563EB" />
+          ) : (
+            <Text style={styles.registerButtonText}>Register</Text>
+          )}
+        </Pressable>
+
+        <Text style={styles.helperText}>
+          New to SafeRoute? Create an account to get started with personalized safety features.
+        </Text>
 
         <Pressable
           style={({ pressed }) => [
@@ -226,6 +262,41 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "600",
+  },
+  divider: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: "#475569",
+  },
+  dividerText: {
+    color: "#94A3B8",
+    fontSize: 14,
+    fontWeight: "600",
+    paddingHorizontal: 12,
+  },
+  registerButton: {
+    backgroundColor: "transparent",
+    borderWidth: 2,
+    borderColor: "#2563EB",
+  },
+  registerButtonText: {
+    color: "#2563EB",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  helperText: {
+    color: "#64748B",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 16,
+    lineHeight: 16,
   },
 });
 
