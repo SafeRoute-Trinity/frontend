@@ -133,7 +133,13 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
         ...( {
           scope: 'openid profile email offline_access',
           redirectUri,
-          ...(showSignup ? { screen_hint: 'signup' } : {}),
+          ...(showSignup ? {
+            screen_hint: 'signup',
+            // Additional metadata for signup - these will be available in Auth0 Actions
+            // To use these fields, configure them in Auth0 Dashboard:
+            // See AUTH0_CUSTOM_SIGNUP.md for detailed instructions
+            login_hint: 'Please provide your full name and ensure passwords match'
+          } : {}),
           ...(forceLogin ? { prompt: 'login' } : {})
         } as any ),
       });

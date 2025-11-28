@@ -22,14 +22,9 @@ export default function Login() {
     }
   };
 
-  const handleRegister = async () => {
-    try {
-      await login(true, shouldForceLogin); // Show signup page
-      // Navigation will happen automatically when isAuthenticated changes
-    } catch (err) {
-      // Error is handled by the context
-      console.error("Registration failed:", err);
-    }
+  const handleRegister = () => {
+    // Navigate to custom registration page
+    router.push("/register");
   };
 
   // Navigate to home when authentication succeeds
@@ -152,7 +147,7 @@ export default function Login() {
         </Pressable>
 
         <Text style={styles.helperText}>
-          Auth0 provides secure authentication for both login and registration
+          New to SafeRoute? Create an account to get started with personalized safety features.
         </Text>
 
         <Pressable
