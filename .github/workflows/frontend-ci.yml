@@ -13,31 +13,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.22.0
-          run_install: false
-
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          cache: 'pnpm'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm ci
 
       - name: Type check
-        run: pnpm exec tsc --noEmit
+        run: npx tsc --noEmit
 
       - name: Run tests (if script exists)
         run: |
-          if pnpm run | grep -q "test"; then
-            pnpm test
+          if npm run | grep -q "test"; then
+            npm test
           else
             echo "No test script, skipping tests"
           fi
 
       - name: Lint
-        run: pnpm lint
+        run: npm run lint
