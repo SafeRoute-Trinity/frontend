@@ -1,14 +1,16 @@
-import { useEffect, useState, useRef } from "react";
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, TextInput, View, FlatList, Modal, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
-import { useAuth0 } from "../contexts/Auth0Context";
-import * as Location from "expo-location";
 import Mapbox, { Camera, PointAnnotation } from "@rnmapbox/maps";
+import * as Location from "expo-location";
+import { useRouter } from "expo-router";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, FlatList, Image, Modal, Pressable, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { initializeMapbox, mapboxConfig } from "../config/mapbox";
+import { useAuth0 } from "../contexts/Auth0Context";
 
 // Initialize Mapbox with access token
-const MAPBOX_ACCESS_TOKEN = process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "";
+const MAPBOX_ACCESS_TOKEN = mapboxConfig.accessToken;
 if (MAPBOX_ACCESS_TOKEN) {
-  Mapbox.setAccessToken(MAPBOX_ACCESS_TOKEN);
+  // Use initializeMapbox() with the already-imported Mapbox instance
+  initializeMapbox(Mapbox);
 }
 
 interface LocationData {
@@ -354,15 +356,26 @@ export default function Index() {
             )}
           </Pressable>
         ) : (
-          <Pressable
-            style={({ pressed }) => [
-              styles.loginAvatarButton,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={() => router.push("/login")}
-          >
-            <Text style={styles.loginAvatarText}>Login</Text>
-          </Pressable>
+          <>
+            <Pressable
+              style={({ pressed }) => [
+                styles.loginAvatarButton,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => router.push("/login")}
+            >
+              <Text style={styles.loginAvatarText}>Login</Text>
+            </Pressable>
+            <Pressable
+              style={({ pressed }) => [
+                styles.healthButton,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => router.push("/health")}
+            >
+              <Text style={styles.healthButtonText}>Health</Text>
+            </Pressable>
+          </>
         )}
       </View>
 
@@ -490,6 +503,7 @@ const styles = StyleSheet.create({
     top: 110,
     right: 16,
     zIndex: 1001,
+    alignItems: "flex-end",
   },
   avatarWithMenu: {
     flexDirection: "row",
@@ -572,6 +586,30 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 10,
     fontWeight: "600",
+  },
+  healthButton: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#6B7280",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 3,
+  },
+  healthButtonText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "500",
   },
   buttonPressed: {
     opacity: 0.85,

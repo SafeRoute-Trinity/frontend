@@ -1,3 +1,4 @@
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -7,13 +8,23 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 
 type ServiceStatusState = "idle" | "checking" | "ok" | "error" | "skipped";
 
 type ServiceStatus = {
   state: ServiceStatusState;
   error?: string;
+  requestData?: {
+    url: string;
+    method: string;
+    headers: Record<string, string>;
+  };
+  responseData?: {
+    status: number;
+    statusText: string;
+    headers: Record<string, string>;
+    body: string;
+  };
 };
 
 type ServiceDefinition = {
@@ -27,70 +38,41 @@ type ServiceDefinition = {
   requiresProxy?: boolean;
 };
 
-const SERVICES: ServiceDefinition[] = [
+// Get services with environment variables - evaluated at runtime
+const getServices = (): ServiceDefinition[] => [
   {
-    id: "auth0",
-    name: "Auth0",
-    description: "Checks Auth0 tenant availability",
-    url: process.env.EXPO_PUBLIC_AUTH0_HEALTH_URL,
+    id: "user-management",
+    name: "User Management",
+    description: "Checks user management service health endpoint",
+    url: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL || undefined,
   },
   {
-    id: "api-gateway",
-    name: "API Gateway",
-    description: "Verifies the primary API gateway health endpoint",
-    url: process.env.EXPO_PUBLIC_API_HEALTH_URL,
+    id: "notification-service",
+    name: "Notification Service",
+    description: "Verifies notification service health endpoint",
+    url: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL || undefined,
   },
   {
-    id: "grafana",
-    name: "Grafana",
-    description: "Verifies Grafana instance is reachable",
-    url: process.env.EXPO_PUBLIC_GRAFANA_HEALTH_URL,
+    id: "routing-service",
+    name: "Routing Service",
+    description: "Checks routing service health endpoint",
+    url: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL || undefined,
   },
   {
-    id: "prometheus",
-    name: "Prometheus",
-    description: "Checks Prometheus metrics endpoint",
-    url: process.env.EXPO_PUBLIC_PROMETHEUS_HEALTH_URL,
+    id: "feedback-service",
+    name: "Feedback Service",
+    description: "Verifies feedback service health endpoint",
+    url: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL || undefined,
   },
   {
-    id: "postgres",
-    name: "PostgreSQL",
-    description:
-      "Requires a backend-provided health endpoint that confirms DB connectivity",
-    url: process.env.EXPO_PUBLIC_POSTGRES_HEALTH_URL,
-    requiresProxy: true,
-  },
-  {
-    id: "postgis",
-    name: "PostGIS",
-    description:
-      "Requires backend verification that PostGIS extensions are enabled",
-    url: process.env.EXPO_PUBLIC_POSTGIS_HEALTH_URL,
-    requiresProxy: true,
-  },
-  {
-    id: "mapbox",
-    name: "Mapbox",
-    description: "Checks Mapbox SDK/token via a lightweight REST call",
-    url: process.env.EXPO_PUBLIC_MAPBOX_HEALTH_URL,
-  },
-  {
-    id: "rabbitmq",
-    name: "RabbitMQ",
-    description:
-      "Needs a backend health bridge that confirms the broker connection",
-    url: process.env.EXPO_PUBLIC_RABBITMQ_HEALTH_URL,
-    requiresProxy: true,
-  },
-  {
-    id: "redis",
-    name: "Redis",
-    description:
-      "Needs a backend health bridge that checks the cache connectivity",
-    url: process.env.EXPO_PUBLIC_REDIS_HEALTH_URL,
-    requiresProxy: true,
+    id: "sos-service",
+    name: "SOS Service",
+    description: "Checks SOS (emergency) service health endpoint",
+    url: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL || undefined,
   },
 ];
+
+const SERVICES = getServices();
 
 const DEFAULT_TIMEOUT_MS = 8000;
 
@@ -99,26 +81,30 @@ export default function Health() {
   const [statuses, setStatuses] = useState<Record<string, ServiceStatus>>({});
   const [isChecking, setIsChecking] = useState(false);
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
+  const [expandedService, setExpandedService] = useState<string | null>(null);
+
+  // Get services dynamically to ensure env vars are read at runtime
+  const services = useMemo(() => getServices(), []);
 
   useEffect(() => {
     setStatuses(
-      SERVICES.reduce<Record<string, ServiceStatus>>((acc, service) => {
+      services.reduce<Record<string, ServiceStatus>>((acc, service) => {
         acc[service.id] = { state: service.url ? "idle" : "skipped" };
         return acc;
       }, {}),
     );
-  }, []);
+  }, [services]);
 
   const pendingChecks = useMemo(
-    () => SERVICES.filter((service) => service.url),
-    [],
+    () => services.filter((service) => service.url),
+    [services],
   );
 
   const handleCheckAll = useCallback(async () => {
     setIsChecking(true);
     setStatuses((prev) => {
       const next = { ...prev };
-      for (const service of SERVICES) {
+      for (const service of services) {
         next[service.id] = service.url
           ? { state: "checking" }
           : {
@@ -131,7 +117,7 @@ export default function Health() {
 
     try {
       const results = await Promise.all(
-        SERVICES.map(async (service) => {
+        services.map(async (service) => {
           if (!service.url) {
             return {
               id: service.id,
@@ -158,7 +144,7 @@ export default function Health() {
     } finally {
       setIsChecking(false);
     }
-  }, []);
+  }, [services]);
 
   useEffect(() => {
     if (pendingChecks.length > 0) {
@@ -221,12 +207,28 @@ export default function Health() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {SERVICES.map((service) => {
+        {services.map((service) => {
           const status = statuses[service.id] ?? { state: "idle" };
+          const isExpanded = expandedService === service.id;
           return (
-            <View key={service.id} style={styles.card}>
+            <Pressable
+              key={service.id}
+              onPress={() => setExpandedService(isExpanded ? null : service.id)}
+              style={({ pressed }) => [
+                styles.card,
+                pressed && styles.cardPressed,
+              ]}
+            >
               <View style={styles.cardHeader}>
-                <Text style={styles.cardTitle}>{service.name}</Text>
+                <View style={styles.cardHeaderLeft}>
+                  <Text style={styles.cardTitle}>{service.name}</Text>
+                  {isExpanded && (
+                    <Text style={styles.expandIndicator}>▼</Text>
+                  )}
+                  {!isExpanded && (
+                    <Text style={styles.expandIndicator}>▶</Text>
+                  )}
+                </View>
                 <StatusBadge status={status.state} />
               </View>
               <Text style={styles.cardDescription}>{service.description}</Text>
@@ -251,7 +253,47 @@ export default function Health() {
               {status.state === "skipped" && status.error && (
                 <Text style={styles.cardNote}>{status.error}</Text>
               )}
-            </View>
+              
+              {/* Expanded JSON View */}
+              {isExpanded && (status.requestData || status.responseData) && (
+                <View style={styles.expandedContent}>
+                  {status.requestData && (
+                    <View style={styles.jsonSection}>
+                      <Text style={styles.jsonSectionTitle}>Request</Text>
+                      <ScrollView
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                        showsHorizontalScrollIndicator={true}
+                        style={styles.jsonContainer}
+                        contentContainerStyle={styles.jsonContent}
+                      >
+                        <Text style={styles.jsonText}>
+                          {JSON.stringify(status.requestData, null, 2)}
+                        </Text>
+                      </ScrollView>
+                    </View>
+                  )}
+                  {status.responseData && (
+                    <View style={styles.jsonSection}>
+                      <Text style={styles.jsonSectionTitle}>
+                        Response ({status.responseData.status} {status.responseData.statusText})
+                      </Text>
+                      <ScrollView
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                        showsHorizontalScrollIndicator={true}
+                        style={styles.jsonContainer}
+                        contentContainerStyle={styles.jsonContent}
+                      >
+                        <Text style={styles.jsonText}>
+                          {formatJsonResponse(status.responseData.body)}
+                        </Text>
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              )}
+            </Pressable>
           );
         })}
       </ScrollView>
@@ -271,33 +313,64 @@ function StatusBadge({ status }: { status: ServiceStatusState }) {
 async function checkHttpService(
   service: ServiceDefinition,
 ): Promise<ServiceStatus> {
+  const requestHeaders = {
+    Accept: "application/json",
+    ...(service.headers ?? {}),
+  };
+  
+  const requestData = {
+    url: service.url!,
+    method: service.method ?? "GET",
+    headers: requestHeaders,
+  };
+
   try {
     const response = await fetchWithTimeout(
       service.url!,
       {
         method: service.method ?? "GET",
-        headers: {
-          Accept: "application/json",
-          ...(service.headers ?? {}),
-        },
+        headers: requestHeaders,
       },
       service.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     );
 
+    // Get response headers
+    const responseHeaders: Record<string, string> = {};
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value;
+    });
+
+    // Get response body
+    const bodyText = await safeReadText(response);
+
+    const responseData = {
+      status: response.status,
+      statusText: response.statusText,
+      headers: responseHeaders,
+      body: bodyText,
+    };
+
     if (!response.ok) {
-      const bodyPreview = await safeReadText(response);
       throw new Error(
         `HTTP ${response.status}${
-          bodyPreview ? ` – ${truncate(bodyPreview, 120)}` : ""
+          bodyText ? ` – ${truncate(bodyText, 120)}` : ""
         }`,
       );
     }
 
-    return { state: "ok" };
+    return { 
+      state: "ok",
+      requestData,
+      responseData,
+    };
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Unexpected error occurred";
-    return { state: "error", error: message };
+    return { 
+      state: "error", 
+      error: message,
+      requestData,
+    };
   }
 }
 
@@ -335,6 +408,17 @@ function truncate(value: string, maxLength: number) {
   return value.length > maxLength
     ? `${value.slice(0, maxLength - 1)}…`
     : value;
+}
+
+function formatJsonResponse(body: string): string {
+  try {
+    // Try to parse as JSON and format it
+    const parsed = JSON.parse(body);
+    return JSON.stringify(parsed, null, 2);
+  } catch {
+    // If not valid JSON, return as-is
+    return body;
+  }
 }
 
 function formatSummary(
@@ -463,11 +547,25 @@ const styles = StyleSheet.create({
     padding: 16,
     marginBottom: 12,
   },
+  cardPressed: {
+    opacity: 0.9,
+  },
   cardHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 6,
+  },
+  cardHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+    marginRight: 8,
+  },
+  expandIndicator: {
+    color: "#94A3B8",
+    fontSize: 10,
+    marginLeft: 8,
   },
   cardTitle: {
     color: "#F8FAFC",
@@ -508,6 +606,38 @@ const styles = StyleSheet.create({
     color: "#0F172A",
     fontSize: 12,
     fontWeight: "700",
+  },
+  expandedContent: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#334155",
+  },
+  jsonSection: {
+    marginBottom: 12,
+  },
+  jsonSectionTitle: {
+    color: "#CBD5F5",
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: 8,
+  },
+  jsonContainer: {
+    backgroundColor: "#0F172A",
+    borderRadius: 8,
+    padding: 12,
+    maxHeight: 300,
+    borderWidth: 1,
+    borderColor: "#334155",
+  },
+  jsonContent: {
+    paddingRight: 8,
+  },
+  jsonText: {
+    color: "#38BDF8",
+    fontSize: 11,
+    fontFamily: "monospace",
+    lineHeight: 16,
   },
 });
 

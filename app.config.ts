@@ -1,12 +1,16 @@
 import type { ExpoConfig } from "expo/config";
 
+// Auth0 configuration - get from environment variables or use defaults
+const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
+const AUTH0_SCHEME = "saferouteapp";
+
 const config: ExpoConfig = {
   name: "saferoute-app",
   slug: "saferoute-app",
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
-  scheme: "saferouteapp",
+  scheme: AUTH0_SCHEME,
   userInterfaceStyle: "automatic",
   newArchEnabled: true,
   ios: {
@@ -64,15 +68,11 @@ const config: ExpoConfig = {
     reactCompiler: true,
   },
   extra: {
-    auth0HealthUrl: process.env.EXPO_PUBLIC_AUTH0_HEALTH_URL,
-    apiHealthUrl: process.env.EXPO_PUBLIC_API_HEALTH_URL,
-    grafanaHealthUrl: process.env.EXPO_PUBLIC_GRAFANA_HEALTH_URL,
-    prometheusHealthUrl: process.env.EXPO_PUBLIC_PROMETHEUS_HEALTH_URL,
-    postgresHealthUrl: process.env.EXPO_PUBLIC_POSTGRES_HEALTH_URL,
-    postgisHealthUrl: process.env.EXPO_PUBLIC_POSTGIS_HEALTH_URL,
-    rabbitmqHealthUrl: process.env.EXPO_PUBLIC_RABBITMQ_HEALTH_URL,
-    redisHealthUrl: process.env.EXPO_PUBLIC_REDIS_HEALTH_URL,
-    mapboxHealthUrl: process.env.EXPO_PUBLIC_MAPBOX_HEALTH_URL,
+    userManagementHealthUrl: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL,
+    notificationServiceHealthUrl: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL,
+    routingServiceHealthUrl: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL,
+    feedbackServiceHealthUrl: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL,
+    sosServiceHealthUrl: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL,
     mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
   },
 };
