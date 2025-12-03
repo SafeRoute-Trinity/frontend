@@ -1,4 +1,4 @@
-import Mapbox, { Camera, PointAnnotation } from "@rnmapbox/maps";
+import Mapbox, { Camera, LineLayer, PointAnnotation, ShapeSource } from "@rnmapbox/maps";
 import * as Location from "expo-location";
 import { useRouter } from "expo-router";
 import { useEffect, useRef, useState } from "react";
@@ -41,6 +41,13 @@ export default function Index() {
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [routeData, setRouteData] = useState<any>(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
+  const [routeError, setRouteError] = useState<string | null>(null);
+  const [routeStart, setRouteStart] = useState<[number, number] | null>(null); // [longitude, latitude]
+  const [routeEnd, setRouteEnd] = useState<[number, number] | null>(null); // [longitude, latitude]
+  const cameraRef = useRef<Camera>(null);
+  const [centerCoordinate, setCenterCoordinate] = useState<[number, number] | null>(null);
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
@@ -66,10 +73,12 @@ export default function Index() {
           accuracy: Location.Accuracy.High,
         });
 
-        setLocation({
+        const newLocation = {
           latitude: currentLocation.coords.latitude,
           longitude: currentLocation.coords.longitude,
-        });
+        };
+        setLocation(newLocation);
+        setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
       } catch (error) {
         console.error("Error getting location:", error);
         setLocationError("Failed to get location");
@@ -88,6 +97,21 @@ export default function Index() {
   const handleZoomOut = () => {
     const newZoom = Math.max(zoomLevel - ZOOM_STEP, MIN_ZOOM);
     setZoomLevel(newZoom);
+  };
+
+  // Center map on current location
+  const handleCenterOnLocation = () => {
+    if (location && cameraRef.current) {
+      const coord: [number, number] = [location.longitude, location.latitude];
+      setCenterCoordinate(coord);
+      setSelectedLocation(null); // Clear any selected location
+      // Use camera ref to programmatically move the camera
+      cameraRef.current.setCamera({
+        centerCoordinate: coord,
+        zoomLevel: zoomLevel,
+        animationDuration: 500,
+      });
+    }
   };
 
   const handleLongPressStart = () => {
@@ -169,10 +193,20 @@ export default function Index() {
   // Handle location selection
   const handleSelectLocation = (result: SearchResult) => {
     const [longitude, latitude] = result.center;
+    const coord: [number, number] = [longitude, latitude];
     setSelectedLocation({ latitude, longitude });
     setZoomLevel(15);
+    setCenterCoordinate(coord); // Update center coordinate to trigger camera movement
     setSearchQuery("");
     setSearchResults([]);
+    // Use camera ref to programmatically move the camera
+    if (cameraRef.current) {
+      cameraRef.current.setCamera({
+        centerCoordinate: coord,
+        zoomLevel: 15,
+        animationDuration: 500,
+      });
+    }
   };
 
   // Handle logout
@@ -204,6 +238,103 @@ export default function Index() {
       console.error("Switch account failed:", error);
     } finally {
       setIsLoggingOut(false);
+    }
+  };
+
+  // Test OpenRouter API
+  const handleTestRoute = async () => {
+    // Build URL with properly formatted coordinates (no spaces after comma)
+    const startLat = 53.341878714221885;
+    const startLon = -6.2522456843725545;
+    const endLat = 53.34446845655061;
+    const endLon = -6.259457236376844;
+    
+    // Try different URL formats in case the API expects a specific format
+    const baseUrl = "https://saferoutemap.duckdns.org/route";
+    const url1 = `${baseUrl}?start=${startLat},${startLon}&end=${endLat},${endLon}&profile=foot-walking`;
+    const url2 = `${baseUrl}?start=${startLat}%2C${startLon}&end=${endLat}%2C${endLon}&profile=foot-walking`;
+    
+    try {
+      setIsLoadingRoute(true);
+      setRouteError(null);
+      
+      // Try first URL format
+      let response = await fetch(url1);
+      
+      // If 404, try second format
+      if (!response.ok && response.status === 404) {
+        console.log("Trying alternative URL format...");
+        response = await fetch(url2);
+      }
+      
+      if (!response.ok) {
+        const errorText = await response.text().catch(() => response.statusText);
+        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // The response should be in Mapbox-compatible GeoJSON format
+      // Based on the expected response, it's already a FeatureCollection
+      let finalRouteData: any;
+      
+      if (data.type === "FeatureCollection") {
+        finalRouteData = data;
+      } else if (data.type === "Feature") {
+        // Wrap single Feature in FeatureCollection
+        finalRouteData = {
+          type: "FeatureCollection",
+          features: [data],
+        };
+      } else if (data.geometry || data.coordinates) {
+        // If it has geometry/coordinates, wrap it in a Feature
+        finalRouteData = {
+          type: "FeatureCollection",
+          features: [{
+            type: "Feature",
+            geometry: data.geometry || {
+              type: "LineString",
+              coordinates: data.coordinates || [],
+            },
+            properties: data.properties || {},
+          }],
+        };
+      } else {
+        // Try to extract route from common formats
+        const routeGeometry = data.routes?.[0]?.geometry || data.geometry;
+        if (routeGeometry) {
+          finalRouteData = {
+            type: "FeatureCollection",
+            features: [{
+              type: "Feature",
+              geometry: routeGeometry,
+              properties: {},
+            }],
+          };
+        } else {
+          throw new Error("Unexpected response format");
+        }
+      }
+      
+      // Extract start and end coordinates from the route
+      const firstFeature = finalRouteData.features?.[0];
+      if (firstFeature?.geometry?.type === "LineString" && firstFeature.geometry.coordinates?.length > 0) {
+        const coordinates = firstFeature.geometry.coordinates;
+        const startCoord = coordinates[0]; // [longitude, latitude]
+        const endCoord = coordinates[coordinates.length - 1]; // [longitude, latitude]
+        
+        setRouteStart(startCoord as [number, number]);
+        setRouteEnd(endCoord as [number, number]);
+      }
+      
+      setRouteData(finalRouteData);
+    } catch (error) {
+      console.error("Route API error:", error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to load route";
+      setRouteError(errorMessage);
+      setRouteData(null);
+    } finally {
+      setIsLoadingRoute(false);
     }
   };
 
@@ -243,18 +374,24 @@ export default function Index() {
             pitchEnabled={true}
             rotateEnabled={true}
             compassEnabled={true}
+            compassViewPosition={3}
+            compassViewMargins={{ x: 12, y: 150 }}
             scaleBarEnabled={true}
             scaleBarPosition={{ bottom: 20, left: 20 }}
           >
             <Camera
+              ref={cameraRef}
               zoomLevel={zoomLevel}
               centerCoordinate={
-                selectedLocation
+                centerCoordinate ||
+                (selectedLocation
                   ? [selectedLocation.longitude, selectedLocation.latitude]
-                  : [location.longitude, location.latitude]
+                  : location
+                  ? [location.longitude, location.latitude]
+                  : undefined)
               }
               animationMode="easeTo"
-              animationDuration={200}
+              animationDuration={500}
               minZoomLevel={MIN_ZOOM}
               maxZoomLevel={MAX_ZOOM}
             />
@@ -276,6 +413,43 @@ export default function Index() {
               >
                 <View style={styles.markerContainer}>
                   <View style={styles.selectedMarker} />
+                </View>
+              </PointAnnotation>
+            )}
+            {/* Route Line */}
+            {routeData && (
+              <ShapeSource id="routeSource" shape={routeData}>
+                <LineLayer
+                  id="routeLine"
+                  style={{
+                    lineColor: "#2563EB",
+                    lineWidth: 4,
+                    lineOpacity: 0.8,
+                  }}
+                />
+              </ShapeSource>
+            )}
+            {/* Start Marker */}
+            {routeStart && (
+              <PointAnnotation
+                id="route-start"
+                coordinate={routeStart}
+                title="Route Start"
+              >
+                <View style={styles.markerContainer}>
+                  <View style={styles.startMarker} />
+                </View>
+              </PointAnnotation>
+            )}
+            {/* End Marker */}
+            {routeEnd && (
+              <PointAnnotation
+                id="route-end"
+                coordinate={routeEnd}
+                title="Route End"
+              >
+                <View style={styles.markerContainer}>
+                  <View style={styles.endMarker} />
                 </View>
               </PointAnnotation>
             )}
@@ -436,6 +610,59 @@ export default function Index() {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      {/* Route Test Button */}
+      {location && (
+        <View style={styles.routeTestContainer}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.routeTestButton,
+              pressed && styles.buttonPressed,
+              isLoadingRoute && styles.zoomButtonDisabled,
+            ]}
+            onPress={handleTestRoute}
+            disabled={isLoadingRoute}
+          >
+            {isLoadingRoute ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.routeTestButtonText}>Test Route</Text>
+            )}
+          </Pressable>
+          {routeError && (
+            <Text style={styles.routeErrorText}>{routeError}</Text>
+          )}
+          {routeData && (
+            <Pressable
+              style={({ pressed }) => [
+                styles.clearRouteButton,
+                pressed && styles.buttonPressed,
+              ]}
+              onPress={() => {
+                setRouteData(null);
+                setRouteError(null);
+                setRouteStart(null);
+                setRouteEnd(null);
+              }}
+            >
+              <Text style={styles.clearRouteButtonText}>Clear Route</Text>
+            </Pressable>
+          )}
+        </View>
+      )}
+
+      {/* Current Location Button */}
+      {location && (
+        <Pressable
+          style={({ pressed }) => [
+            styles.locationButton,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={handleCenterOnLocation}
+        >
+          <Text style={styles.locationButtonIcon}>🔵</Text>
+        </Pressable>
+      )}
 
       {/* Zoom Controls */}
       {location && (
@@ -636,13 +863,148 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: "#FFFFFF",
   },
+  startMarker: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#16A34A",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  endMarker: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#DC2626",
+    borderWidth: 3,
+    borderColor: "#FFFFFF",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  routeTestContainer: {
+    position: "absolute",
+    left: 16,
+    bottom: 100,
+    zIndex: 1000,
+    alignItems: "flex-start",
+  },
+  routeTestButton: {
+    backgroundColor: "#2563EB",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+    minWidth: 100,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  routeTestButtonText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  clearRouteButton: {
+    backgroundColor: "#DC2626",
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 8,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  clearRouteButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  routeErrorText: {
+    color: "#F87171",
+    fontSize: 11,
+    marginTop: 4,
+    maxWidth: 200,
+  },
+  compassContainer: {
+    position: "absolute",
+    right: 16,
+    bottom: 160,
+    zIndex: 1000,
+  },
+  compassIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  compassText: {
+    fontSize: 20,
+  },
+  locationButton: {
+    position: "absolute",
+    right: 16,
+    bottom: 210,
+    zIndex: 1000,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  locationButtonIcon: {
+    fontSize: 20,
+  },
   zoomControls: {
     position: "absolute",
     right: 16,
-    bottom: 100,
+    bottom: 60,
     zIndex: 1000,
     backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 8,
+    borderRadius: 6,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: {
@@ -654,8 +1016,8 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   zoomButton: {
-    width: 48,
-    height: 48,
+    width: 40,
+    height: 40,
     justifyContent: "center",
     alignItems: "center",
     backgroundColor: "rgba(255, 255, 255, 0.95)",
@@ -667,10 +1029,10 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   zoomButtonText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "600",
     color: "#1F2937",
-    lineHeight: 28,
+    lineHeight: 24,
   },
   zoomDivider: {
     height: 1,
