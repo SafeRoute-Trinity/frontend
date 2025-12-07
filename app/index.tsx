@@ -130,10 +130,10 @@ export default function Index() {
       setIsSearching(true);
       const encodedQuery = encodeURIComponent(query);
       const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=5`;
-      
+
       const response = await fetch(url);
       const data = await response.json();
-      
+
       if (data.features) {
         setSearchResults(data.features.map((feature: any) => ({
           id: feature.id,
@@ -405,7 +405,8 @@ export default function Index() {
               <Text style={styles.menuItemIcon}>👤</Text>
               <Text style={styles.menuItemText}>View Profile</Text>
             </Pressable>
-            <View style={styles.menuDivider} />
+            {/* Switch Account button hidden */}
+            {/* <View style={styles.menuDivider} />
             <Pressable
               style={({ pressed }) => [
                 styles.menuItem,
@@ -418,7 +419,7 @@ export default function Index() {
               <Text style={styles.menuItemText}>
                 {isLoggingOut ? "Switching..." : "Switch Account"}
               </Text>
-            </Pressable>
+            </Pressable> */}
             <View style={styles.menuDivider} />
             <Pressable
               style={({ pressed }) => [

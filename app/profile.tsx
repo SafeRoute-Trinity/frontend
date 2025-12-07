@@ -12,7 +12,7 @@ export default function Profile() {
     try {
       setIsLoggingOut(true);
       await logout();
-      router.replace("/");
+      router.replace("/login");
     } catch (error) {
       console.error("Logout failed:", error);
     } finally {
@@ -65,11 +65,11 @@ export default function Profile() {
               </Text>
             </View>
           )}
-          
+
           {user.name && (
             <Text style={styles.userName}>{user.name}</Text>
           )}
-          
+
           {user.email && (
             <Text style={styles.userEmail}>{user.email}</Text>
           )}
