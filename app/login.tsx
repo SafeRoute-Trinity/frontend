@@ -1,23 +1,29 @@
 import { useEffect, useState } from "react";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from "react-native";
 import { useAuth0 } from "../contexts/Auth0Context";
 
 export default function Login() {
-  const { login, logout, isLoading, error, isAuthenticated, user } = useAuth0();
+  const { nativeLogin, isLoading, error: auth0Error, isAuthenticated, user } = useAuth0();
   const router = useRouter();
-  const params = useLocalSearchParams();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  // Check if we should force login (e.g., when switching accounts)
-  const shouldForceLogin = params.forceLogin === "true";
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
     try {
-      await login(false, shouldForceLogin);
+      setError(null);
+
+      // Basic validation
+      if (!email || !password) {
+        setError("Please enter both email and password");
+        return;
+      }
+
+      await nativeLogin(email, password);
       // Navigation will happen automatically when isAuthenticated changes
-    } catch (err) {
-      // Error is handled by the context
+    } catch (err: any) {
+      setError(err.message || "Login failed. Please try again.");
       console.error("Login failed:", err);
     }
   };
@@ -29,82 +35,75 @@ export default function Login() {
 
   // Navigate to home when authentication succeeds
   useEffect(() => {
+    console.log('🔍 Login page - Auth state:', { isAuthenticated, hasUser: !!user, userEmail: user?.email });
     if (isAuthenticated && user) {
+      console.log('🚀 Redirecting to homepage...');
       router.replace("/");
     }
   }, [isAuthenticated, user, router]);
 
-  const handleLogout = async () => {
-    try {
-      setIsLoggingOut(true);
-      await logout();
-      // User will be logged out, component will re-render showing login form
-    } catch (err) {
-      console.error("Logout failed:", err);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
-  // If already authenticated, show user info
+  // If already authenticated, show loading
   if (isAuthenticated && user) {
     return (
       <View style={styles.container}>
-        <View style={styles.card}>
-          <Text style={styles.title}>Logged In</Text>
-          <Text style={styles.subtitle}>Welcome back!</Text>
-          {user.name && (
-            <Text style={styles.userName}>{user.name}</Text>
-          )}
-          {user.email && (
-            <Text style={styles.userEmail}>{user.email}</Text>
-          )}
-          <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              styles.secondaryButton,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={() => router.back()}
-          >
-            <Text style={styles.secondaryButtonText}>Back to Home</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              styles.logoutButton,
-              isLoggingOut && styles.buttonDisabled,
-              pressed && !isLoggingOut && styles.buttonPressed,
-            ]}
-            onPress={handleLogout}
-            disabled={isLoggingOut}
-          >
-            {isLoggingOut ? (
-              <ActivityIndicator color="#FFFFFF" />
-            ) : (
-              <Text style={styles.logoutButtonText}>Logout</Text>
-            )}
-          </Pressable>
-        </View>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>Redirecting...</Text>
       </View>
     );
   }
 
+  const displayError = error || auth0Error?.message;
+
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      style={styles.container}
+    >
       <View style={styles.card}>
         <Text style={styles.title}>Login to SafeRoute</Text>
         <Text style={styles.subtitle}>
-          Sign in with Auth0 to access full features
+          Sign in with your email and password
         </Text>
 
-        {error && (
+        {displayError && (
           <View style={styles.errorContainer}>
             <Text style={styles.errorText}>
-              {error.message || "Login failed, please try again"}
+              {displayError}
             </Text>
           </View>
         )}
+
+        {/* Email Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="your.email@example.com"
+            placeholderTextColor="#64748B"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            editable={!isLoading}
+          />
+        </View>
+
+        {/* Password Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            placeholderTextColor="#64748B"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry={true}
+            autoCapitalize="none"
+            autoComplete="password"
+            editable={!isLoading}
+          />
+        </View>
 
         <Pressable
           style={({ pressed }) => [
@@ -139,11 +138,7 @@ export default function Login() {
           onPress={handleRegister}
           disabled={isLoading || isAuthenticated}
         >
-          {isLoading ? (
-            <ActivityIndicator color="#2563EB" />
-          ) : (
-            <Text style={styles.registerButtonText}>Register</Text>
-          )}
+          <Text style={styles.registerButtonText}>Register</Text>
         </Pressable>
 
         <Text style={styles.helperText}>
@@ -161,7 +156,7 @@ export default function Login() {
           <Text style={styles.secondaryButtonText}>Cancel</Text>
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -297,6 +292,32 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 16,
     lineHeight: 16,
+  },
+  inputContainer: {
+    width: "100%",
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#CBD5F5",
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: "#0F172A",
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    color: "#F8FAFC",
+    borderWidth: 1,
+    borderColor: "#475569",
+    width: "100%",
+  },
+  loadingText: {
+    color: "#CBD5F5",
+    fontSize: 16,
+    marginTop: 16,
+    textAlign: "center",
   },
 });
 
