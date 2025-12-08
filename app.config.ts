@@ -1,8 +1,9 @@
+import 'dotenv/config';
 import type { ExpoConfig } from "expo/config";
 
 // Auth0 configuration - get from environment variables or use defaults
 const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
-const AUTH0_SCHEME = "saferouteapp";
+const AUTH0_SCHEME = process.env.EXPO_PUBLIC_AUTH0_SCHEME || "saferouteapp";
 
 const config: ExpoConfig = {
   name: "saferoute-app",
@@ -29,8 +30,23 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    edgeToEdgeEnabled: true,
+    edgeToEdgeEnabled: false,
     predictiveBackGestureEnabled: false,
+
+    intentFilters: [
+      {
+        action: "VIEW",
+        data: [
+          {
+            scheme: AUTH0_SCHEME,
+            host: AUTH0_DOMAIN,
+            pathPrefix: "/android/${applicationId}/callback"
+          }
+        ],
+        category: ["BROWSABLE", "DEFAULT"]
+      }
+    ],
+    
   },
   web: {
     output: "static",
@@ -74,6 +90,9 @@ const config: ExpoConfig = {
     feedbackServiceHealthUrl: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL,
     sosServiceHealthUrl: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL,
     mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
+    eas: {
+      projectId: "30887207-a650-4dbc-a2d8-44c74ad412ad",
+    },
   },
 };
 
