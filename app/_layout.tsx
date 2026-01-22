@@ -1,14 +1,14 @@
-import { Stack } from "expo-router";
-import { Auth0Provider } from "../contexts/Auth0Context";
+import { Stack } from 'expo-router';
+import { Auth0Provider } from '../contexts/Auth0Context';
 
-export default function RootLayout() {
-  return (
-    <Auth0Provider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-        }}
-      />
-    </Auth0Provider>
-  );
-}
+const RootLayout = () => (
+  <Auth0Provider>
+    <Stack
+      screenOptions={{
+        headerShown: false,
+      }}
+    />
+  </Auth0Provider>
+);
+
+export default RootLayout;
