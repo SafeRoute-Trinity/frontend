@@ -1,7 +1,8 @@
+/* eslint-disable no-console */
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { getAuth0, auth0Config } from '../config/auth0';
+import { auth0Config, getAuth0 } from '../config/auth0';
 
 interface User {
   sub: string;
@@ -60,7 +61,7 @@ const simpleStore = {
   },
 };
 
-async function getStoredItem(key: string): Promise<string | null> {
+const getStoredItem = async (key: string): Promise<string | null> => {
   if (Platform.OS === 'web') {
     return simpleStore.getItem(key);
   }
@@ -69,9 +70,9 @@ async function getStoredItem(key: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
+};
 
-async function setStoredItem(key: string, value: string): Promise<void> {
+const setStoredItem = async (key: string, value: string): Promise<void> => {
   if (Platform.OS === 'web') {
     return simpleStore.setItem(key, value);
   }
@@ -80,9 +81,9 @@ async function setStoredItem(key: string, value: string): Promise<void> {
   } catch {
     // Ignore
   }
-}
+};
 
-async function removeStoredItem(key: string): Promise<void> {
+const removeStoredItem = async (key: string): Promise<void> => {
   if (Platform.OS === 'web') {
     return simpleStore.removeItem(key);
   }
@@ -91,9 +92,9 @@ async function removeStoredItem(key: string): Promise<void> {
   } catch {
     // Ignore
   }
-}
+};
 
-export function Auth0Provider({ children }: { children: ReactNode }) {
+export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -358,12 +359,12 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
   };
 
   return <Auth0Context.Provider value={value}>{children}</Auth0Context.Provider>;
-}
+};
 
-export function useAuth0() {
+export const useAuth0 = () => {
   const context = useContext(Auth0Context);
   if (context === undefined) {
     throw new Error('useAuth0 must be used within an Auth0Provider');
   }
   return context;
-}
+};

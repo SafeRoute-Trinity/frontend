@@ -1,19 +1,144 @@
-import { useState } from 'react';
 import { useRouter } from 'expo-router';
+import { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { auth0Config } from '../config/auth0';
 
-export default function Register() {
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#0F172A',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    paddingVertical: 40,
+  },
+  card: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 24,
+    width: '100%',
+    maxWidth: 400,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subtitle: {
+    fontSize: 16,
+    color: '#CBD5F5',
+    marginBottom: 24,
+    textAlign: 'center',
+  },
+  errorContainer: {
+    backgroundColor: '#7F1D1D',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  errorText: {
+    color: '#FCA5A5',
+    fontSize: 14,
+    textAlign: 'center',
+  },
+  inputContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#CBD5F5',
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: '#0F172A',
+    borderRadius: 8,
+    padding: 14,
+    fontSize: 16,
+    color: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#475569',
+  },
+  inputError: {
+    borderColor: '#DC2626',
+  },
+  fieldErrorText: {
+    color: '#FCA5A5',
+    fontSize: 12,
+    marginTop: 4,
+  },
+  button: {
+    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8,
+    minHeight: 48,
+  },
+  primaryButton: {
+    backgroundColor: '#2563EB',
+    marginTop: 16,
+  },
+  secondaryButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: '#475569',
+    marginTop: 8,
+  },
+  buttonPressed: {
+    opacity: 0.85,
+  },
+  buttonDisabled: {
+    backgroundColor: '#1D4ED8',
+    opacity: 0.6,
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  secondaryButtonText: {
+    color: '#CBD5F5',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  loginContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  loginText: {
+    color: '#94A3B8',
+    fontSize: 14,
+  },
+  loginLink: {
+    color: '#2563EB',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+});
+
+const Register = () => {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -121,14 +246,15 @@ export default function Register() {
 
       // Registration successful
       const data = await response.json();
-      console.log('Registration successful:', data);
+      // console.log('Registration successful:', data);
 
       // Show success message and redirect to login
-      alert('Registration successful! Please log in with your credentials.');
-      router.replace('/login');
+      Alert.alert('Registration successful!', 'Please log in with your credentials.', [
+        { text: 'OK', onPress: () => router.replace('/login') },
+      ]);
     } catch (err: any) {
       setError(err.message || 'Registration failed. Please try again.');
-      console.error('Registration error:', err);
+      // console.error('Registration error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -320,128 +446,6 @@ export default function Register() {
       </ScrollView>
     </KeyboardAvoidingView>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-    paddingVertical: 40,
-  },
-  card: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
-    width: '100%',
-    maxWidth: 400,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#CBD5F5',
-    marginBottom: 24,
-    textAlign: 'center',
-  },
-  errorContainer: {
-    backgroundColor: '#7F1D1D',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  errorText: {
-    color: '#FCA5A5',
-    fontSize: 14,
-    textAlign: 'center',
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#CBD5F5',
-    marginBottom: 8,
-  },
-  input: {
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    padding: 14,
-    fontSize: 16,
-    color: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#475569',
-  },
-  inputError: {
-    borderColor: '#DC2626',
-  },
-  fieldErrorText: {
-    color: '#FCA5A5',
-    fontSize: 12,
-    marginTop: 4,
-  },
-  button: {
-    borderRadius: 10,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-    minHeight: 48,
-  },
-  primaryButton: {
-    backgroundColor: '#2563EB',
-    marginTop: 16,
-  },
-  secondaryButton: {
-    backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#475569',
-    marginTop: 8,
-  },
-  buttonPressed: {
-    opacity: 0.85,
-  },
-  buttonDisabled: {
-    backgroundColor: '#1D4ED8',
-    opacity: 0.6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  secondaryButtonText: {
-    color: '#CBD5F5',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  loginContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  loginText: {
-    color: '#94A3B8',
-    fontSize: 14,
-  },
-  loginLink: {
-    color: '#2563EB',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-});
+export default Register;

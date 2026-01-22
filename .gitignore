@@ -46,3 +46,4 @@ app-example
 
 
 install_error.log
+*.txt

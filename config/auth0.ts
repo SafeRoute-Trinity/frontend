@@ -1,3 +1,4 @@
+/* eslint-disable no-console */
 import { Platform } from 'react-native';
 
 // Get configuration from environment variables or constants
@@ -16,7 +17,7 @@ export const auth0Config = {
 let auth0Instance: any = null;
 let initializationAttempted = false;
 
-function initializeAuth0(): any {
+const initializeAuth0 = (): any => {
   if (auth0Instance !== null) {
     return auth0Instance;
   }
@@ -71,12 +72,12 @@ function initializeAuth0(): any {
   }
 
   return auth0Instance;
-}
+};
 
 // Export a getter function that lazily initializes Auth0
-export function getAuth0() {
+export const getAuth0 = () => {
   return initializeAuth0();
-}
+};
 
 // For backward compatibility, export auth0 as a getter
 // This will be null if the native module isn't available

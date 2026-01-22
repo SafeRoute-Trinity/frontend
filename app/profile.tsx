@@ -1,92 +1,7 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
 import { useAuth0 } from '../contexts/Auth0Context';
-
-export default function Profile() {
-  const router = useRouter();
-  const { user, logout, isAuthenticated } = useAuth0();
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-
-  const handleLogout = async () => {
-    try {
-      setIsLoggingOut(true);
-      await logout();
-      router.replace('/login');
-    } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
-  if (!isAuthenticated || !user) {
-    return (
-      <View style={styles.container}>
-        <View style={styles.content}>
-          <Text style={styles.title}>Not Logged In</Text>
-          <Pressable
-            style={({ pressed }) => [
-              styles.button,
-              styles.loginButton,
-              pressed && styles.buttonPressed,
-            ]}
-            onPress={() => router.push('/login')}
-          >
-            <Text style={styles.buttonText}>Go to Login</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
-  return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Pressable style={styles.backButton} onPress={() => router.back()}>
-          <Text style={styles.backButtonText}>← Back</Text>
-        </Pressable>
-      </View>
-
-      <View style={styles.content}>
-        <View style={styles.profileSection}>
-          {user.picture ? (
-            <Image source={{ uri: user.picture }} style={styles.profileImage} />
-          ) : (
-            <View style={styles.profileImagePlaceholder}>
-              <Text style={styles.profileImagePlaceholderText}>
-                {user.name?.charAt(0).toUpperCase() || 'U'}
-              </Text>
-            </View>
-          )}
-
-          {user.name && <Text style={styles.userName}>{user.name}</Text>}
-
-          {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
-        </View>
-
-        <View style={styles.actionsSection}>
-          <Pressable
-            onPress={handleLogout}
-            disabled={isLoggingOut}
-            style={({ pressed }) => [
-              styles.button,
-              styles.logoutButton,
-              isLoggingOut && styles.buttonDisabled,
-              pressed && !isLoggingOut && styles.buttonPressed,
-            ]}
-          >
-            {isLoggingOut ? (
-              <ActivityIndicator color="#FFFFFF" size="small" />
-            ) : (
-              <Text style={styles.buttonText}>Logout</Text>
-            )}
-          </Pressable>
-        </View>
-      </View>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -185,3 +100,90 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
 });
+
+const Profile = () => {
+  const router = useRouter();
+  const { user, logout, isAuthenticated } = useAuth0();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      setIsLoggingOut(true);
+      await logout();
+      router.replace('/login');
+    } catch (error) {
+      // console.error('Logout failed:', error);
+    } finally {
+      setIsLoggingOut(false);
+    }
+  };
+
+  if (!isAuthenticated || !user) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.content}>
+          <Text style={styles.title}>Not Logged In</Text>
+          <Pressable
+            style={({ pressed }) => [
+              styles.button,
+              styles.loginButton,
+              pressed && styles.buttonPressed,
+            ]}
+            onPress={() => router.push('/login')}
+          >
+            <Text style={styles.buttonText}>Go to Login</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Pressable style={styles.backButton} onPress={() => router.back()}>
+          <Text style={styles.backButtonText}>← Back</Text>
+        </Pressable>
+      </View>
+
+      <View style={styles.content}>
+        <View style={styles.profileSection}>
+          {user.picture ? (
+            <Image source={{ uri: user.picture }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profileImagePlaceholder}>
+              <Text style={styles.profileImagePlaceholderText}>
+                {user.name?.charAt(0).toUpperCase() || 'U'}
+              </Text>
+            </View>
+          )}
+
+          {user.name && <Text style={styles.userName}>{user.name}</Text>}
+
+          {user.email && <Text style={styles.userEmail}>{user.email}</Text>}
+        </View>
+
+        <View style={styles.actionsSection}>
+          <Pressable
+            onPress={handleLogout}
+            disabled={isLoggingOut}
+            style={({ pressed }) => [
+              styles.button,
+              styles.logoutButton,
+              isLoggingOut && styles.buttonDisabled,
+              pressed && !isLoggingOut && styles.buttonPressed,
+            ]}
+          >
+            {isLoggingOut ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.buttonText}>Logout</Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+};
+
+export default Profile;

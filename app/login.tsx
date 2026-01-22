@@ -1,173 +1,16 @@
+import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useAuth0 } from '../contexts/Auth0Context';
-
-export default function Login() {
-  const { nativeLogin, isLoading, error: auth0Error, isAuthenticated, user } = useAuth0();
-  const router = useRouter();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  const handleLogin = async () => {
-    try {
-      setError(null);
-
-      // Basic validation
-      if (!email || !password) {
-        setError('Please enter both email and password');
-        return;
-      }
-
-      await nativeLogin(email, password);
-      // Navigation will happen automatically when isAuthenticated changes
-    } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.');
-      console.error('Login failed:', err);
-    }
-  };
-
-  const handleRegister = () => {
-    // Navigate to custom registration page
-    router.push('/register');
-  };
-
-  // Navigate to home when authentication succeeds
-  useEffect(() => {
-    console.log('🔍 Login page - Auth state:', {
-      isAuthenticated,
-      hasUser: !!user,
-      userEmail: user?.email,
-    });
-    if (isAuthenticated && user) {
-      console.log('🚀 Redirecting to homepage...');
-      router.replace('/');
-    }
-  }, [isAuthenticated, user, router]);
-
-  // If already authenticated, show loading
-  if (isAuthenticated && user) {
-    return (
-      <View style={styles.container}>
-        <ActivityIndicator size="large" color="#2563EB" />
-        <Text style={styles.loadingText}>Redirecting...</Text>
-      </View>
-    );
-  }
-
-  const displayError = error || auth0Error?.message;
-
-  return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <View style={styles.card}>
-        <Text style={styles.title}>Login to SafeRoute</Text>
-        <Text style={styles.subtitle}>Sign in with your email and password</Text>
-
-        {displayError && (
-          <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{displayError}</Text>
-          </View>
-        )}
-
-        {/* Email Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="your.email@example.com"
-            placeholderTextColor="#64748B"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoComplete="email"
-            editable={!isLoading}
-          />
-        </View>
-
-        {/* Password Input */}
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Password</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Enter your password"
-            placeholderTextColor="#64748B"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoCapitalize="none"
-            autoComplete="password"
-            editable={!isLoading}
-          />
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            styles.primaryButton,
-            (isLoading || isAuthenticated) && styles.buttonDisabled,
-            pressed && !isLoading && !isAuthenticated && styles.buttonPressed,
-          ]}
-          onPress={handleLogin}
-          disabled={isLoading || isAuthenticated}
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Login</Text>
-          )}
-        </Pressable>
-
-        <View style={styles.divider}>
-          <View style={styles.dividerLine} />
-          <Text style={styles.dividerText}>OR</Text>
-          <View style={styles.dividerLine} />
-        </View>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            styles.registerButton,
-            (isLoading || isAuthenticated) && styles.buttonDisabled,
-            pressed && !isLoading && !isAuthenticated && styles.buttonPressed,
-          ]}
-          onPress={handleRegister}
-          disabled={isLoading || isAuthenticated}
-        >
-          <Text style={styles.registerButtonText}>Register</Text>
-        </Pressable>
-
-        <Text style={styles.helperText}>
-          New to SafeRoute? Create an account to get started with personalized safety features.
-        </Text>
-
-        <Pressable
-          style={({ pressed }) => [
-            styles.button,
-            styles.secondaryButton,
-            pressed && styles.buttonPressed,
-          ]}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -329,3 +172,162 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+const Login = () => {
+  const { nativeLogin, isLoading, error: auth0Error, isAuthenticated, user } = useAuth0();
+  const router = useRouter();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const handleLogin = async () => {
+    try {
+      setError(null);
+
+      // Basic validation
+      if (!email || !password) {
+        setError('Please enter both email and password');
+        return;
+      }
+
+      await nativeLogin(email, password);
+      // Navigation will happen automatically when isAuthenticated changes
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.');
+      // console.error('Login failed:', err);
+    }
+  };
+
+  const handleRegister = () => {
+    // Navigate to custom registration page
+    router.push('/register');
+  };
+
+  // Navigate to home when authentication succeeds
+  useEffect(() => {
+    // console.log('🔍 Login page - Auth state:', {
+    //   isAuthenticated,
+    //   hasUser: !!user,
+    //   userEmail: user?.email,
+    // });
+    if (isAuthenticated && user) {
+      // console.log('🚀 Redirecting to homepage...');
+      router.replace('/');
+    }
+  }, [isAuthenticated, user, router]);
+
+  // If already authenticated, show loading
+  if (isAuthenticated && user) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#2563EB" />
+        <Text style={styles.loadingText}>Redirecting...</Text>
+      </View>
+    );
+  }
+
+  const displayError = error || auth0Error?.message;
+
+  return (
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <View style={styles.card}>
+        <Text style={styles.title}>Login to SafeRoute</Text>
+        <Text style={styles.subtitle}>Sign in with your email and password</Text>
+
+        {displayError && (
+          <View style={styles.errorContainer}>
+            <Text style={styles.errorText}>{displayError}</Text>
+          </View>
+        )}
+
+        {/* Email Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="your.email@example.com"
+            placeholderTextColor="#64748B"
+            value={email}
+            onChangeText={setEmail}
+            keyboardType="email-address"
+            autoCapitalize="none"
+            autoComplete="email"
+            editable={!isLoading}
+          />
+        </View>
+
+        {/* Password Input */}
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter your password"
+            placeholderTextColor="#64748B"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            autoCapitalize="none"
+            autoComplete="password"
+            editable={!isLoading}
+          />
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            styles.primaryButton,
+            (isLoading || isAuthenticated) && styles.buttonDisabled,
+            pressed && !isLoading && !isAuthenticated && styles.buttonPressed,
+          ]}
+          onPress={handleLogin}
+          disabled={isLoading || isAuthenticated}
+        >
+          {isLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Login</Text>
+          )}
+        </Pressable>
+
+        <View style={styles.divider}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>OR</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            styles.registerButton,
+            (isLoading || isAuthenticated) && styles.buttonDisabled,
+            pressed && !isLoading && !isAuthenticated && styles.buttonPressed,
+          ]}
+          onPress={handleRegister}
+          disabled={isLoading || isAuthenticated}
+        >
+          <Text style={styles.registerButtonText}>Register</Text>
+        </Pressable>
+
+        <Text style={styles.helperText}>
+          New to SafeRoute? Create an account to get started with personalized safety features.
+        </Text>
+
+        <Pressable
+          style={({ pressed }) => [
+            styles.button,
+            styles.secondaryButton,
+            pressed && styles.buttonPressed,
+          ]}
+          onPress={() => router.back()}
+        >
+          <Text style={styles.secondaryButtonText}>Cancel</Text>
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
+  );
+};
+
+export default Login;

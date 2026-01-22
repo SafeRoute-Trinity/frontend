@@ -3,6 +3,7 @@
  * Automatically includes Auth0 JWT token in Authorization header.
  */
 
+/* eslint-disable no-console */
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
@@ -39,7 +40,7 @@ const getAccessToken = async (): Promise<string | null> => {
   try {
     return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
   } catch (error) {
-    console.error('Error retrieving access token:', error);
+    // console.error('Error retrieving access token:', error);
     return null;
   }
 };
@@ -86,7 +87,7 @@ export const apiRequest = async (
     return response;
   } catch (error) {
     // Log unexpected errors with context before rethrowing
-    console.error(`Request to ${url} failed:`, error);
+    // console.error(`Request to ${url} failed:`, error);
     throw error;
   }
 };
