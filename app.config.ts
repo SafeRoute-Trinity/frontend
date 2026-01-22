@@ -1,65 +1,68 @@
-import type { ExpoConfig } from "expo/config";
+import type { ExpoConfig } from 'expo/config';
 
 // Auth0 configuration - get from environment variables or use defaults
 const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
-const AUTH0_SCHEME = "saferouteapp";
+const AUTH0_SCHEME = 'saferouteapp';
 
 const config: ExpoConfig = {
-  name: "saferoute-app",
-  slug: "saferoute-app",
-  version: "1.0.0",
-  orientation: "portrait",
-  icon: "./assets/images/icon.png",
+  name: 'saferoute-app',
+  slug: 'saferoute-app',
+  version: '1.0.0',
+  orientation: 'portrait',
+  icon: './assets/images/icon.png',
   scheme: AUTH0_SCHEME,
-  userInterfaceStyle: "automatic",
+  userInterfaceStyle: 'automatic',
   newArchEnabled: true,
   ios: {
     supportsTablet: true,
-    bundleIdentifier: "com.anonymous.saferouteapp",
+    bundleIdentifier: 'com.anonymous.saferouteapp',
     infoPlist: {
-      NSLocationWhenInUseUsageDescription: "This app needs access to your location to show your position on the map.",
-      NSLocationAlwaysAndWhenInUseUsageDescription: "This app uses your location in the background to provide continuous tracking.",
+      NSLocationWhenInUseUsageDescription:
+        'This app needs access to your location to show your position on the map.',
+      NSLocationAlwaysAndWhenInUseUsageDescription:
+        'This app uses your location in the background to provide continuous tracking.',
     },
   },
   android: {
-    package: "com.anonymous.saferouteapp",
+    package: 'com.anonymous.saferouteapp',
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
-      foregroundImage: "./assets/images/android-icon-foreground.png",
-      backgroundImage: "./assets/images/android-icon-background.png",
-      monochromeImage: "./assets/images/android-icon-monochrome.png",
+      backgroundColor: '#E6F4FE',
+      foregroundImage: './assets/images/android-icon-foreground.png',
+      backgroundImage: './assets/images/android-icon-background.png',
+      monochromeImage: './assets/images/android-icon-monochrome.png',
     },
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
   },
   web: {
-    output: "static",
-    favicon: "./assets/images/favicon.png",
+    output: 'static',
+    favicon: './assets/images/favicon.png',
   },
   plugins: [
-    "expo-router",
+    'expo-router',
     [
-      "expo-splash-screen",
+      'expo-splash-screen',
       {
-        image: "./assets/images/splash-icon.png",
+        image: './assets/images/splash-icon.png',
         imageWidth: 200,
-        resizeMode: "contain",
-        backgroundColor: "#ffffff",
+        resizeMode: 'contain',
+        backgroundColor: '#ffffff',
         dark: {
-          backgroundColor: "#000000",
+          backgroundColor: '#000000',
         },
       },
     ],
     [
-      "@rnmapbox/maps",
+      '@rnmapbox/maps',
       {
-        RNMapboxMapsDownloadToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || "",
+        RNMapboxMapsDownloadToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN || '',
       },
     ],
     [
-      "expo-location",
+      'expo-location',
       {
-        locationAlwaysAndWhenInUsePermission: "Allow SafeRoute to use your location to show your position on the map.",
+        locationAlwaysAndWhenInUsePermission:
+          'Allow SafeRoute to use your location to show your position on the map.',
       },
     ],
   ],
@@ -78,6 +81,3 @@ const config: ExpoConfig = {
 };
 
 export default config;
-
-
-

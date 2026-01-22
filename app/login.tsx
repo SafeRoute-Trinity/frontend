@@ -1,13 +1,22 @@
-import { useEffect, useState } from "react";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, KeyboardAvoidingView, Platform } from "react-native";
-import { useAuth0 } from "../contexts/Auth0Context";
+import { useEffect, useState } from 'react';
+import { useRouter, useLocalSearchParams } from 'expo-router';
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import { useAuth0 } from '../contexts/Auth0Context';
 
 export default function Login() {
   const { nativeLogin, isLoading, error: auth0Error, isAuthenticated, user } = useAuth0();
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const handleLogin = async () => {
@@ -16,29 +25,33 @@ export default function Login() {
 
       // Basic validation
       if (!email || !password) {
-        setError("Please enter both email and password");
+        setError('Please enter both email and password');
         return;
       }
 
       await nativeLogin(email, password);
       // Navigation will happen automatically when isAuthenticated changes
     } catch (err: any) {
-      setError(err.message || "Login failed. Please try again.");
-      console.error("Login failed:", err);
+      setError(err.message || 'Login failed. Please try again.');
+      console.error('Login failed:', err);
     }
   };
 
   const handleRegister = () => {
     // Navigate to custom registration page
-    router.push("/register");
+    router.push('/register');
   };
 
   // Navigate to home when authentication succeeds
   useEffect(() => {
-    console.log('🔍 Login page - Auth state:', { isAuthenticated, hasUser: !!user, userEmail: user?.email });
+    console.log('🔍 Login page - Auth state:', {
+      isAuthenticated,
+      hasUser: !!user,
+      userEmail: user?.email,
+    });
     if (isAuthenticated && user) {
       console.log('🚀 Redirecting to homepage...');
-      router.replace("/");
+      router.replace('/');
     }
   }, [isAuthenticated, user, router]);
 
@@ -56,20 +69,16 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
       <View style={styles.card}>
         <Text style={styles.title}>Login to SafeRoute</Text>
-        <Text style={styles.subtitle}>
-          Sign in with your email and password
-        </Text>
+        <Text style={styles.subtitle}>Sign in with your email and password</Text>
 
         {displayError && (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>
-              {displayError}
-            </Text>
+            <Text style={styles.errorText}>{displayError}</Text>
           </View>
         )}
 
@@ -163,161 +172,160 @@ export default function Login() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0F172A",
-    justifyContent: "center",
-    alignItems: "center",
+    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
   card: {
-    backgroundColor: "#1E293B",
+    backgroundColor: '#1E293B',
     borderRadius: 16,
     padding: 24,
-    width: "100%",
+    width: '100%',
     maxWidth: 400,
-    alignItems: "center",
+    alignItems: 'center',
   },
   title: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#F8FAFC",
+    fontWeight: '700',
+    color: '#F8FAFC',
     marginBottom: 8,
-    textAlign: "center",
+    textAlign: 'center',
   },
   subtitle: {
     fontSize: 16,
-    color: "#CBD5F5",
+    color: '#CBD5F5',
     marginBottom: 24,
-    textAlign: "center",
+    textAlign: 'center',
   },
   userName: {
     fontSize: 20,
-    fontWeight: "600",
-    color: "#F8FAFC",
+    fontWeight: '600',
+    color: '#F8FAFC',
     marginBottom: 8,
-    textAlign: "center",
+    textAlign: 'center',
   },
   userEmail: {
     fontSize: 14,
-    color: "#94A3B8",
+    color: '#94A3B8',
     marginBottom: 24,
-    textAlign: "center",
+    textAlign: 'center',
   },
   errorContainer: {
-    backgroundColor: "#7F1D1D",
+    backgroundColor: '#7F1D1D',
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
-    width: "100%",
+    width: '100%',
   },
   errorText: {
-    color: "#FCA5A5",
+    color: '#FCA5A5',
     fontSize: 14,
-    textAlign: "center",
+    textAlign: 'center',
   },
   button: {
     borderRadius: 10,
     paddingVertical: 14,
     paddingHorizontal: 24,
-    width: "100%",
-    alignItems: "center",
-    justifyContent: "center",
+    width: '100%',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 12,
     minHeight: 48,
   },
   primaryButton: {
-    backgroundColor: "#2563EB",
+    backgroundColor: '#2563EB',
   },
   secondaryButton: {
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: "#475569",
+    borderColor: '#475569',
   },
   buttonPressed: {
     opacity: 0.85,
   },
   buttonDisabled: {
-    backgroundColor: "#1D4ED8",
+    backgroundColor: '#1D4ED8',
     opacity: 0.6,
   },
   primaryButtonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   secondaryButtonText: {
-    color: "#CBD5F5",
+    color: '#CBD5F5',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   logoutButton: {
-    backgroundColor: "#DC2626",
+    backgroundColor: '#DC2626',
     marginTop: 8,
   },
   logoutButtonText: {
-    color: "#FFFFFF",
+    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   divider: {
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
     marginVertical: 16,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: "#475569",
+    backgroundColor: '#475569',
   },
   dividerText: {
-    color: "#94A3B8",
+    color: '#94A3B8',
     fontSize: 14,
-    fontWeight: "600",
+    fontWeight: '600',
     paddingHorizontal: 12,
   },
   registerButton: {
-    backgroundColor: "transparent",
+    backgroundColor: 'transparent',
     borderWidth: 2,
-    borderColor: "#2563EB",
+    borderColor: '#2563EB',
   },
   registerButtonText: {
-    color: "#2563EB",
+    color: '#2563EB',
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: '600',
   },
   helperText: {
-    color: "#64748B",
+    color: '#64748B',
     fontSize: 12,
-    textAlign: "center",
+    textAlign: 'center',
     marginTop: 8,
     marginBottom: 16,
     lineHeight: 16,
   },
   inputContainer: {
-    width: "100%",
+    width: '100%',
     marginBottom: 16,
   },
   label: {
     fontSize: 14,
-    fontWeight: "600",
-    color: "#CBD5F5",
+    fontWeight: '600',
+    color: '#CBD5F5',
     marginBottom: 8,
   },
   input: {
-    backgroundColor: "#0F172A",
+    backgroundColor: '#0F172A',
     borderRadius: 8,
     padding: 14,
     fontSize: 16,
-    color: "#F8FAFC",
+    color: '#F8FAFC',
     borderWidth: 1,
-    borderColor: "#475569",
-    width: "100%",
+    borderColor: '#475569',
+    width: '100%',
   },
   loadingText: {
-    color: "#CBD5F5",
+    color: '#CBD5F5',
     fontSize: 16,
     marginTop: 16,
-    textAlign: "center",
+    textAlign: 'center',
   },
 });
-

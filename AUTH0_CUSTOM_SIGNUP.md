@@ -50,16 +50,16 @@ exports.onExecutePreUserRegistration = async (event, api) => {
 
   // 设置用户的 metadata
   if (firstName) {
-    api.user.setUserMetadata("first_name", firstName);
+    api.user.setUserMetadata('first_name', firstName);
   }
 
   if (lastName) {
-    api.user.setUserMetadata("last_name", lastName);
+    api.user.setUserMetadata('last_name', lastName);
   }
 
   // 可选：设置用户的显示名称
   if (firstName && lastName) {
-    api.user.setAppMetadata("full_name", `${firstName} ${lastName}`);
+    api.user.setAppMetadata('full_name', `${firstName} ${lastName}`);
   }
 };
 ```
@@ -108,32 +108,32 @@ var lock = new Auth0Lock(config.clientID, config.auth0Domain, {
 
   additionalSignUpFields: [
     {
-      name: "first_name",
-      placeholder: "First Name",
-      validator: function(firstName) {
+      name: 'first_name',
+      placeholder: 'First Name',
+      validator: function (firstName) {
         return {
           valid: firstName.length > 0,
-          hint: "First name is required"
+          hint: 'First name is required',
         };
-      }
+      },
     },
     {
-      name: "last_name",
-      placeholder: "Last Name",
-      validator: function(lastName) {
+      name: 'last_name',
+      placeholder: 'Last Name',
+      validator: function (lastName) {
         return {
           valid: lastName.length > 0,
-          hint: "Last name is required"
+          hint: 'Last name is required',
         };
-      }
-    }
+      },
+    },
   ],
 
   auth: {
     params: {
-      scope: "openid profile email"
-    }
-  }
+      scope: 'openid profile email',
+    },
+  },
 });
 ```
 
@@ -144,6 +144,7 @@ var lock = new Auth0Lock(config.clientID, config.auth0Domain, {
 ### 5. 配置密码确认
 
 **密码确认功能是 Auth0 内置的**：
+
 - Auth0 的注册表单默认要求用户输入密码两次
 - 无需额外配置，这是标准的安全实践
 
@@ -212,20 +213,25 @@ const userInfo = await auth0.auth.userInfo({
 ## 常见问题
 
 ### Q: 自定义字段的数据存储在哪里？
+
 A: Auth0 会将自定义字段存储在用户的 `user_metadata` 中。
 
 ### Q: 如何在后端 API 中获取这些字段？
+
 A: 在 JWT token 的 claims 中包含这些信息，或者通过 Auth0 Management API 查询用户信息。
 
 ### Q: 密码策略在哪里配置？
+
 A: **Security** → **Database** → 选择你的 Database Connection → **Password Policy**
 
 ### Q: 如何自定义错误消息？
+
 A: 在 Lock 配置的 `languageDictionary` 中添加自定义消息，或在 Universal Login 的 HTML 模板中修改。
 
 ## 推荐配置
 
 对于生产环境，推荐：
+
 1. 使用 **New Universal Login Experience**（更现代、安全）
 2. 配置强密码策略（至少 8 个字符，包含大小写字母和数字）
 3. 使用 **Actions** 处理额外的注册逻辑

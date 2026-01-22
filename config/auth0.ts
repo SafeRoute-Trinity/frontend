@@ -4,7 +4,8 @@ import { Platform } from 'react-native';
 // In production, it's recommended to use environment variables
 // Note: Domain should NOT include https://, just the domain name (e.g., your-tenant.auth0.com)
 const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
-const AUTH0_CLIENT_ID = process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID || 'mSrCz4yhWpbgyhOpK4gfB9a6lbMoM6ct';
+const AUTH0_CLIENT_ID =
+  process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID || 'mSrCz4yhWpbgyhOpK4gfB9a6lbMoM6ct';
 
 export const auth0Config = {
   domain: AUTH0_DOMAIN,
@@ -26,11 +27,11 @@ function initializeAuth0(): any {
 
   if (!initializationAttempted) {
     initializationAttempted = true;
-    
+
     // Suppress console warnings for TurboModule errors during initialization
     const originalWarn = console.warn;
     const originalError = console.error;
-    
+
     try {
       // Temporarily suppress TurboModule warnings
       console.warn = (...args: any[]) => {
@@ -41,7 +42,7 @@ function initializeAuth0(): any {
         }
         originalWarn.apply(console, args);
       };
-      
+
       console.error = (...args: any[]) => {
         const message = args[0]?.toString() || '';
         if (message.includes('TurboModuleRegistry') || message.includes('A0Auth0')) {
@@ -50,7 +51,7 @@ function initializeAuth0(): any {
         }
         originalError.apply(console, args);
       };
-      
+
       // Try to load and initialize Auth0
       const Auth0Module = require('react-native-auth0');
       const Auth0Class = Auth0Module.default || Auth0Module;
@@ -88,4 +89,3 @@ export const auth0 = new Proxy({} as any, {
     return instance[prop];
   },
 });
-

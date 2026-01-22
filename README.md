@@ -13,7 +13,6 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
 2. Configure environment variables
 
    In `.env` update each URL to point at your deployed or locally running health endpoints. All variables must start with `EXPO_PUBLIC_` so that they are embedded in the Expo bundle.
-
    - Auth-only services (Auth0, Grafana, Prometheus, Mapbox, API Gateway) can reference their native health endpoints or an authenticated proxy.
    - Non-HTTP infrastructure (PostgreSQL/PostGIS, RabbitMQ, Redis) should expose an HTTP health bridge via your backend microservices. Each bridge route should attempt a lightweight operation (e.g., `SELECT 1`, `PING`, queue inspection) and return `200` on success.
 

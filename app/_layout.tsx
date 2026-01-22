@@ -1,5 +1,5 @@
-import { Stack } from "expo-router";
-import { Auth0Provider } from "../contexts/Auth0Context";
+import { Stack } from 'expo-router';
+import { Auth0Provider } from '../contexts/Auth0Context';
 
 export default function RootLayout() {
   return (

@@ -64,6 +64,7 @@ android: {
 ```
 
 Then add to the `.env` file:
+
 ```env
 EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=your-google-maps-api-key
 ```
@@ -92,11 +93,13 @@ After configuration:
 ## 5. Troubleshooting
 
 ### Token Not Working
+
 - Ensure environment variables start with `EXPO_PUBLIC_`
 - Restart the Expo development server
 - For production builds, you need to rebuild the app
 
 ### Map Not Displaying
+
 - Check if the access token is correct
 - Check network connection
 - Check console error messages
