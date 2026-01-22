@@ -45,5 +45,5 @@ app-example
 /android
 
 
-*.log
+install_error.log
 *.txt

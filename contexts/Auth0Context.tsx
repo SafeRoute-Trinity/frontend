@@ -1,7 +1,8 @@
+/* eslint-disable no-console */
 import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
-import { getAuth0, auth0Config } from '../config/auth0';
+import { auth0Config, getAuth0 } from '../config/auth0';
 
 interface User {
   sub: string;
@@ -60,7 +61,7 @@ const simpleStore = {
   },
 };
 
-async function getStoredItem(key: string): Promise<string | null> {
+const getStoredItem = async (key: string): Promise<string | null> => {
   if (Platform.OS === 'web') {
     return simpleStore.getItem(key);
   }
@@ -69,9 +70,9 @@ async function getStoredItem(key: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
+};
 
-async function setStoredItem(key: string, value: string): Promise<void> {
+const setStoredItem = async (key: string, value: string): Promise<void> => {
   if (Platform.OS === 'web') {
     return simpleStore.setItem(key, value);
   }
@@ -80,9 +81,9 @@ async function setStoredItem(key: string, value: string): Promise<void> {
   } catch {
     // Ignore
   }
-}
+};
 
-async function removeStoredItem(key: string): Promise<void> {
+const removeStoredItem = async (key: string): Promise<void> => {
   if (Platform.OS === 'web') {
     return simpleStore.removeItem(key);
   }
@@ -91,9 +92,9 @@ async function removeStoredItem(key: string): Promise<void> {
   } catch {
     // Ignore
   }
-}
+};
 
-export function Auth0Provider({ children }: { children: ReactNode }) {
+export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
@@ -115,7 +116,6 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
     loadUser();
   }, []);
 
-
   const nativeLogin = async (email: string, password: string) => {
     try {
       setError(null);
@@ -124,23 +124,20 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
       console.log('🔐 Starting native login with email:', email);
 
       // Call Auth0 OAuth token endpoint with Resource Owner Password Grant
-      const response = await fetch(
-        `https://${auth0Config.domain}/oauth/token`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            grant_type: 'password',
-            username: email.trim(),
-            password: password,
-            client_id: auth0Config.clientId,
-            scope: 'openid profile email offline_access',
-            realm: 'Username-Password-Authentication', // Specify database connection
-          }),
-        }
-      );
+      const response = await fetch(`https://${auth0Config.domain}/oauth/token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          grant_type: 'password',
+          username: email.trim(),
+          password: password,
+          client_id: auth0Config.clientId,
+          scope: 'openid profile email offline_access',
+          realm: 'Username-Password-Authentication', // Specify database connection
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -153,9 +150,7 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
           throw new Error('Account access has been denied');
         } else {
           throw new Error(
-            errorData.error_description ||
-            errorData.message ||
-            'Login failed. Please try again.'
+            errorData.error_description || errorData.message || 'Login failed. Please try again.'
           );
         }
       }
@@ -175,14 +170,11 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
 
       // Get user information
       console.log('🔍 Fetching user info...');
-      const userInfoResponse = await fetch(
-        `https://${auth0Config.domain}/userinfo`,
-        {
-          headers: {
-            Authorization: `Bearer ${credentials.access_token}`,
-          },
-        }
-      );
+      const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
+        headers: {
+          Authorization: `Bearer ${credentials.access_token}`,
+        },
+      });
 
       if (!userInfoResponse.ok) {
         throw new Error('Failed to fetch user information');
@@ -214,16 +206,18 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
 
       const auth0 = getAuth0();
       if (!auth0) {
-        throw new Error('Auth0 native module is not available. Please rebuild the app with: npx expo prebuild && npx expo run:ios');
+        throw new Error(
+          'Auth0 native module is not available. Please rebuild the app with: npx expo prebuild && npx expo run:ios'
+        );
       }
 
-      const redirectUri = "saferouteapp://auth/callback";
+      const redirectUri = 'saferouteapp://auth/callback';
 
       console.log('🔐 Calling auth0.webAuth.authorize with:', {
         scope: 'openid profile email offline_access',
         redirectUri,
         prompt: 'login',
-        showSignup
+        showSignup,
       });
 
       // Add timeout to detect if WebView fails to load
@@ -233,15 +227,17 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
         ...({
           scope: 'openid profile email offline_access',
           redirectUri,
-          ...(showSignup ? {
-            screen_hint: 'signup',
-            // Additional metadata for signup - these will be available in Auth0 Actions
-            // To use these fields, configure them in Auth0 Dashboard:
-            // See AUTH0_CUSTOM_SIGNUP.md for detailed instructions
-            login_hint: 'Please provide your full name and ensure passwords match'
-          } : {}),
+          ...(showSignup
+            ? {
+                screen_hint: 'signup',
+                // Additional metadata for signup - these will be available in Auth0 Actions
+                // To use these fields, configure them in Auth0 Dashboard:
+                // See AUTH0_CUSTOM_SIGNUP.md for detailed instructions
+                login_hint: 'Please provide your full name and ensure passwords match',
+              }
+            : {}),
           // Always prompt for login to avoid consent screen with cached sessions
-          prompt: 'login'
+          prompt: 'login',
         } as any),
       });
 
@@ -254,7 +250,7 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
       });
 
       // Race between authorize and timeout (just for logging, won't actually timeout)
-      Promise.race([authorizePromise, timeoutPromise]).catch(() => { });
+      Promise.race([authorizePromise, timeoutPromise]).catch(() => {});
 
       // Use Auth0 webAuth for login or signup
       const credentials = await authorizePromise;
@@ -262,7 +258,7 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
       console.log('✅ Authorization completed! Credentials received:', {
         hasAccessToken: !!credentials.accessToken,
         hasRefreshToken: !!credentials.refreshToken,
-        tokenType: credentials.tokenType
+        tokenType: credentials.tokenType,
       });
 
       // Save tokens
@@ -363,13 +359,12 @@ export function Auth0Provider({ children }: { children: ReactNode }) {
   };
 
   return <Auth0Context.Provider value={value}>{children}</Auth0Context.Provider>;
-}
+};
 
-export function useAuth0() {
+export const useAuth0 = () => {
   const context = useContext(Auth0Context);
   if (context === undefined) {
     throw new Error('useAuth0 must be used within an Auth0Provider');
   }
   return context;
-}
-
+};
