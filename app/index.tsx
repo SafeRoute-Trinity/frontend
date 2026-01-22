@@ -118,7 +118,7 @@ export default function Index() {
       // Use camera ref to programmatically move the camera
       cameraRef.current.setCamera({
         centerCoordinate: coord,
-        zoomLevel: zoomLevel,
+        zoomLevel,
         animationDuration: 500,
       });
     }
@@ -338,7 +338,7 @@ export default function Index() {
         firstFeature?.geometry?.type === 'LineString' &&
         firstFeature.geometry.coordinates?.length > 0
       ) {
-        const coordinates = firstFeature.geometry.coordinates;
+        const { coordinates } = firstFeature.geometry;
         const startCoord = coordinates[0]; // [longitude, latitude]
         const endCoord = coordinates[coordinates.length - 1]; // [longitude, latitude]
 
@@ -358,16 +358,17 @@ export default function Index() {
   };
 
   // Cleanup on unmount
-  useEffect(() => {
-    return () => {
+  useEffect(
+    () => () => {
       if (longPressTimerRef.current) {
         clearInterval(longPressTimerRef.current);
       }
       if (searchTimeoutRef.current) {
         clearTimeout(searchTimeoutRef.current);
       }
-    };
-  }, []);
+    },
+    []
+  );
 
   return (
     <View style={styles.container}>
@@ -388,14 +389,14 @@ export default function Index() {
             styleURL={Mapbox.StyleURL.Dark}
             logoEnabled={false}
             attributionEnabled={false}
-            zoomEnabled={true}
-            scrollEnabled={true}
-            pitchEnabled={true}
-            rotateEnabled={true}
-            compassEnabled={true}
+            zoomEnabled
+            scrollEnabled
+            pitchEnabled
+            rotateEnabled
+            compassEnabled
             compassViewPosition={3}
             compassViewMargins={{ x: 12, y: 150 }}
-            scaleBarEnabled={true}
+            scaleBarEnabled
             scaleBarPosition={{ bottom: 20, left: 20 }}
           >
             <Camera
@@ -414,7 +415,7 @@ export default function Index() {
               minZoomLevel={MIN_ZOOM}
               maxZoomLevel={MAX_ZOOM}
             />
-            <Mapbox.UserLocation visible={true} />
+            <Mapbox.UserLocation visible />
             <PointAnnotation
               id="user-location"
               coordinate={[location.longitude, location.latitude]}
@@ -555,7 +556,7 @@ export default function Index() {
       {/* Account Menu Modal */}
       <Modal
         visible={showAccountMenu}
-        transparent={true}
+        transparent
         animationType="fade"
         onRequestClose={() => setShowAccountMenu(false)}
       >

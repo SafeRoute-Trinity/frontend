@@ -233,9 +233,9 @@ export default function Health() {
                     <View style={styles.jsonSection}>
                       <Text style={styles.jsonSectionTitle}>Request</Text>
                       <ScrollView
-                        nestedScrollEnabled={true}
-                        showsVerticalScrollIndicator={true}
-                        showsHorizontalScrollIndicator={true}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                        showsHorizontalScrollIndicator
                         style={styles.jsonContainer}
                         contentContainerStyle={styles.jsonContent}
                       >
@@ -251,9 +251,9 @@ export default function Health() {
                         Response ({status.responseData.status} {status.responseData.statusText})
                       </Text>
                       <ScrollView
-                        nestedScrollEnabled={true}
-                        showsVerticalScrollIndicator={true}
-                        showsHorizontalScrollIndicator={true}
+                        nestedScrollEnabled
+                        showsVerticalScrollIndicator
+                        showsHorizontalScrollIndicator
                         style={styles.jsonContainer}
                         contentContainerStyle={styles.jsonContent}
                       >
@@ -273,14 +273,14 @@ export default function Health() {
   );
 }
 
-function StatusBadge({ status }: { status: ServiceStatusState }) {
+const StatusBadge = ({ status }: { status: ServiceStatusState }) => {
   const label = STATUS_LABELS[status];
   return (
     <View style={[styles.badge, { backgroundColor: STATUS_COLORS[status] }]}>
       <Text style={styles.badgeText}>{label}</Text>
     </View>
   );
-}
+};
 
 async function checkHttpService(service: ServiceDefinition): Promise<ServiceStatus> {
   const requestHeaders = {

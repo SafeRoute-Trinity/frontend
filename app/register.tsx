@@ -92,7 +92,7 @@ export default function Register() {
         body: JSON.stringify({
           client_id: auth0Config.clientId,
           email: email.trim(),
-          password: password,
+          password,
           connection: 'Username-Password-Authentication',
           user_metadata: {
             first_name: firstName.trim(),
@@ -239,7 +239,7 @@ export default function Register() {
                 setPassword(text);
                 setFieldErrors((prev) => ({ ...prev, password: undefined }));
               }}
-              secureTextEntry={true}
+              secureTextEntry
               autoCapitalize="none"
               autoComplete="password-new"
               textContentType="newPassword"
@@ -266,7 +266,7 @@ export default function Register() {
                   confirmPassword: undefined,
                 }));
               }}
-              secureTextEntry={true}
+              secureTextEntry
               autoCapitalize="none"
               autoComplete="password-new"
               textContentType="newPassword"

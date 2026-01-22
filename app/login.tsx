@@ -107,7 +107,7 @@ export default function Login() {
             placeholderTextColor="#64748B"
             value={password}
             onChangeText={setPassword}
-            secureTextEntry={true}
+            secureTextEntry
             autoCapitalize="none"
             autoComplete="password"
             editable={!isLoading}
