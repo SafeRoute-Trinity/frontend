@@ -94,6 +94,27 @@ const removeStoredItem = async (key: string): Promise<void> => {
   }
 };
 
+// Helper function to decode JWT token (does not verify signature)
+const decodeJWT = (token: string): any => {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      console.warn('Token is not a valid JWT (does not have 3 parts)');
+      return null;
+    }
+
+    // Decode the payload (second part)
+    const payload = parts[1];
+    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const decoded = atob(paddedBase64);
+    return JSON.parse(decoded);
+  } catch (err) {
+    console.error('Failed to decode JWT:', err);
+    return null;
+  }
+};
+
 export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -121,7 +142,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setError(null);
       setIsLoading(true);
 
-      console.log('🔐 Starting native login with email:', email);
+      console.log('ðŸ” Starting native login with email:', email);
 
       // Call Auth0 OAuth token endpoint with Resource Owner Password Grant
       const response = await fetch(`https://${auth0Config.domain}/oauth/token`, {
@@ -132,10 +153,11 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
         body: JSON.stringify({
           grant_type: 'password',
           username: email.trim(),
-          password: password,
+          password,
           client_id: auth0Config.clientId,
           scope: 'openid profile email offline_access',
           realm: 'Username-Password-Authentication', // Specify database connection
+          audience: 'https://saferouteapp.eu.auth0.com/api/v2/', // Add audience to get JWT tokens
         }),
       });
 
@@ -157,19 +179,26 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
 
       const credentials = await response.json();
       console.log('✅ Native login successful! Tokens received');
+      console.log(' Full credentials response:', JSON.stringify(credentials, null, 2));
+
+      // Decode and log the access token
+      if (credentials.access_token) {
+        const decodedToken = decodeJWT(credentials.access_token);
+        console.log(' Decoded access_token:', JSON.stringify(decodedToken, null, 2));
+      }
 
       // Save tokens
       if (credentials.access_token) {
         await setStoredItem(ACCESS_TOKEN_KEY, credentials.access_token);
-        console.log('💾 Access token saved');
+        console.log('ðŸ’¾ Access token saved');
       }
       if (credentials.refresh_token) {
         await setStoredItem(REFRESH_TOKEN_KEY, credentials.refresh_token);
-        console.log('💾 Refresh token saved');
+        console.log('ðŸ’¾ Refresh token saved');
       }
 
       // Get user information
-      console.log('🔍 Fetching user info...');
+      console.log('ðŸ” Fetching user info...');
       const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
         headers: {
           Authorization: `Bearer ${credentials.access_token}`,
@@ -177,20 +206,20 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!userInfoResponse.ok) {
-        throw new Error('Failed to fetch user information');
+        throw new Error('âŒ Failed to fetch user information');
       }
 
       const userInfo = await userInfoResponse.json();
-      console.log('✅ User info received:', { email: userInfo.email, sub: userInfo.sub });
+      console.log('âœ… User info received:', { email: userInfo.email, sub: userInfo.sub });
 
       setUser(userInfo);
       await setStoredItem(USER_KEY, JSON.stringify(userInfo));
 
-      console.log('✅ Native login complete! User:', userInfo.email || userInfo.sub);
+      console.log('âœ… Native login complete! User:', userInfo.email || userInfo.sub);
     } catch (err: any) {
       setError(err);
-      console.error('❌ Native login error:', err);
-      console.error('❌ Error message:', err.message);
+      console.error('âŒ Native login error:', err);
+      console.error('âŒ Error message:', err.message);
       throw err; // Re-throw so the login page can handle it
     } finally {
       setIsLoading(false);
@@ -202,7 +231,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setError(null);
       setIsLoading(true);
 
-      console.log('🔐 Starting login process...', { showSignup, forceLogin });
+      console.log('ðŸ” Starting login process...', { showSignup, forceLogin });
 
       const auth0 = getAuth0();
       if (!auth0) {
@@ -213,7 +242,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
 
       const redirectUri = 'saferouteapp://auth/callback';
 
-      console.log('🔐 Calling auth0.webAuth.authorize with:', {
+      console.log('ðŸ” Calling auth0.webAuth.authorize with:', {
         scope: 'openid profile email offline_access',
         redirectUri,
         prompt: 'login',
@@ -244,8 +273,8 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // Wait for 5 seconds to see if WebView loads
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
-          console.log('⏱️ 5 seconds elapsed - WebView might be stuck on blank page');
-          console.log('⚠️ If you see a blank page, this indicates a network or WebView issue');
+          console.log('â±ï¸ 5 seconds elapsed - WebView might be stuck on blank page');
+          console.log('âš ï¸ If you see a blank page, this indicates a network or WebView issue');
         }, 5000);
       });
 
@@ -255,7 +284,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // Use Auth0 webAuth for login or signup
       const credentials = await authorizePromise;
 
-      console.log('✅ Authorization completed! Credentials received:', {
+      console.log('âœ… Authorization completed! Credentials received:', {
         hasAccessToken: !!credentials.accessToken,
         hasRefreshToken: !!credentials.refreshToken,
         tokenType: credentials.tokenType,
@@ -264,48 +293,48 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // Save tokens
       if (credentials.accessToken) {
         await setStoredItem(ACCESS_TOKEN_KEY, credentials.accessToken);
-        console.log('💾 Access token saved');
+        console.log('ðŸ’¾ Access token saved');
       }
       if (credentials.refreshToken) {
         await setStoredItem(REFRESH_TOKEN_KEY, credentials.refreshToken);
-        console.log('💾 Refresh token saved');
+        console.log('ðŸ’¾ Refresh token saved');
       }
 
-      console.log('🔍 Fetching user info...');
+      console.log('ðŸ” Fetching user info...');
       // Get user information
       const userInfo = await auth0.auth.userInfo({
         token: credentials.accessToken,
       });
 
-      console.log('✅ User info received:', { email: userInfo.email, sub: userInfo.sub });
+      console.log('âœ… User info received:', { email: userInfo.email, sub: userInfo.sub });
 
       setUser(userInfo);
       await setStoredItem(USER_KEY, JSON.stringify(userInfo));
 
-      console.log('✅ Login successful! User:', userInfo.email || userInfo.sub);
-      console.log('✅ isAuthenticated will be:', !!userInfo);
+      console.log('âœ… Login successful! User:', userInfo.email || userInfo.sub);
+      console.log('âœ… isAuthenticated will be:', !!userInfo);
     } catch (err: any) {
       // User cancellation is not considered an error
       if (err.error !== 'a0.session.user_cancelled') {
         setError(err);
-        console.error('❌ Login error:', err);
-        console.error('❌ Error details:', JSON.stringify(err, null, 2));
-        console.error('❌ Error message:', err.message);
-        console.error('❌ Error code:', err.code);
+        console.error('âŒ Login error:', err);
+        console.error('âŒ Error details:', JSON.stringify(err, null, 2));
+        console.error('âŒ Error message:', err.message);
+        console.error('âŒ Error code:', err.code);
 
         // Provide helpful error message for blank page issue
         if (err.message && err.message.includes('network')) {
-          console.error('💡 Network error detected. Please check:');
+          console.error('ðŸ’¡ Network error detected. Please check:');
           console.error('   1. Android emulator has internet connection');
           console.error('   2. Auth0 domain is accessible from emulator');
           console.error('   3. Try accessing https://saferoute.eu.auth0.com in Chrome on emulator');
         }
       } else {
-        console.log('ℹ️ User cancelled login');
+        console.log('â„¹ï¸ User cancelled login');
       }
     } finally {
       setIsLoading(false);
-      console.log('🔐 Login process finished');
+      console.log('ðŸ” Login process finished');
     }
   };
 
@@ -336,7 +365,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // Clear user state - this will trigger UI update
       setUser(null);
 
-      console.log('✅ Logout complete');
+      console.log('âœ… Logout complete');
     } catch (err) {
       // Even if there's an error, try to clear user state
       setError(err as Error);
