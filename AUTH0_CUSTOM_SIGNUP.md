@@ -1,54 +1,54 @@
-# Auth0 自定义注册配置指南
+# Auth0 Custom Signup Configuration Guide
 
-## 添加 First Name、Last Name 和密码确认功能
+## Adding First Name, Last Name, and Password Confirmation
 
-要在 Auth0 注册流程中添加 first name、last name 字段以及密码确认功能，需要在 Auth0 Dashboard 中进行配置。
+To add first name and last name fields, as well as password confirmation to your Auth0 signup flow, you need to configure it in the Auth0 Dashboard.
 
-## 前提：检查你的 Universal Login 版本
+## Prerequisite: Check Your Universal Login Version
 
-1. 登录 [Auth0 Dashboard](https://manage.auth0.com/)
-2. 导航到 **Branding** → **Universal Login**
-3. 查看页面顶部，确认是使用 **Classic** 还是 **New** Universal Login Experience
+1. Log in to the [Auth0 Dashboard](https://manage.auth0.com/)
+2. Navigate to **Branding** → **Universal Login**
+3. Check the top of the page to confirm if you are using the **Classic** or **New** Universal Login Experience.
 
-根据你使用的版本，选择对应的配置方法。
+Choose the corresponding configuration method based on your version.
 
 ---
 
-## ⭐ 推荐方法：使用 Auth0 Actions（适用于所有版本）
+## ⭐ Recommended Method: Using Auth0 Actions (Applicable to All Versions)
 
-这是最灵活和现代的方法，适用于 Classic 和 New Universal Login。
+This is the most flexible and modern approach, suitable for both Classic and New Universal Login.
 
-### 1. 启用 Database Connection 的自定义字段
+### 1. Enable Custom Fields for Database Connection
 
-1. 进入 **Authentication** → **Database**
-2. 点击你的 Database Connection（如 `Username-Password-Authentication`）
-3. 进入 **Settings** 标签
-4. 找到 **Requires Username** 选项（可选，如果需要用户名）
-5. 保存更改
+1. Go to **Authentication** → **Database**
+2. Click on your Database Connection (e.g., `Username-Password-Authentication`)
+3. Go to the **Settings** tab
+4. Find the **Requires Username** option (optional, if you need a username)
+5. Save changes
 
-### 2. 创建 Pre-User Registration Action
+### 2. Create Pre-User Registration Action
 
-这个 Action 会在用户注册时收集额外的字段。
+This Action will collect additional fields during user registration.
 
-1. 导航到 **Actions** → **Library**
-2. 点击 **+ Build Custom**
-3. 创建新 Action：
+1. Navigate to **Actions** → **Library**
+2. Click **+ Build Custom**
+3. Create a new Action:
    - **Name**: `Add Custom Signup Fields`
    - **Trigger**: `Pre User Registration`
-   - **Runtime**: 选择最新版本
+   - **Runtime**: Select the latest version
 
-4. 使用以下代码：
+4. Use the following code:
 
 ```javascript
 /**
  * Handler that will be called during Pre User Registration
  */
 exports.onExecutePreUserRegistration = async (event, api) => {
-  // 从表单数据中获取自定义字段
+  // Get custom fields from form data
   const firstName = event.request.body?.first_name || event.request.body?.given_name;
   const lastName = event.request.body?.last_name || event.request.body?.family_name;
 
-  // 设置用户的 metadata
+  // Set user metadata
   if (firstName) {
     api.user.setUserMetadata('first_name', firstName);
   }
@@ -57,31 +57,31 @@ exports.onExecutePreUserRegistration = async (event, api) => {
     api.user.setUserMetadata('last_name', lastName);
   }
 
-  // 可选：设置用户的显示名称
+  // Optional: Set user's display name
   if (firstName && lastName) {
     api.user.setAppMetadata('full_name', `${firstName} ${lastName}`);
   }
 };
 ```
 
-5. 点击 **Deploy**
-6. 进入 **Actions** → **Flows** → **Pre User Registration**
-7. 将刚创建的 Action 拖到流程中
-8. 点击 **Apply**
+5. Click **Deploy**
+6. Go to **Actions** → **Flows** → **Pre User Registration**
+7. Drag the newly created Action into the flow
+8. Click **Apply**
 
-### 3. 配置注册表单显示字段
+### 3. Configure Registration Form Display Fields
 
-#### 如果使用 New Universal Login：
+#### If using New Universal Login:
 
-1. 进入 **Branding** → **Universal Login**
-2. 点击 **Advanced Options**
-3. 在 **Signup** 部分，启用 **Prompt for Name** 选项
-4. 这会自动显示 First Name 和 Last Name 字段
+1. Go to **Branding** → **Universal Login**
+2. Click **Advanced Options**
+3. In the **Signup** section, enable the **Prompt for Name** option
+4. This will automatically show First Name and Last Name fields
 
-或者使用 API 配置：
+Alternatively, use the API to configure:
 
 ```bash
-# 使用 Auth0 Management API
+# Using Auth0 Management API
 curl -X PATCH 'https://YOUR_DOMAIN.auth0.com/api/v2/prompts/signup' \
   -H 'Authorization: Bearer YOUR_MANAGEMENT_TOKEN' \
   -H 'Content-Type: application/json' \
@@ -95,16 +95,16 @@ curl -X PATCH 'https://YOUR_DOMAIN.auth0.com/api/v2/prompts/signup' \
   }'
 ```
 
-#### 如果使用 Classic Universal Login (Lock Widget)：
+#### If using Classic Universal Login (Lock Widget):
 
-1. 进入 **Branding** → **Universal Login**
-2. 切换到 **Advanced** 标签
-3. 启用 **Customize Login Page**
-4. 在模板代码中找到 Lock 配置，添加：
+1. Go to **Branding** → **Universal Login**
+2. Switch to the **Advanced** tab
+3. Enable **Customize Login Page**
+4. Find the Lock configuration in the template code and add:
 
 ```javascript
 var lock = new Auth0Lock(config.clientID, config.auth0Domain, {
-  // ... 现有配置
+  // ... existing configuration
 
   additionalSignUpFields: [
     {
@@ -137,58 +137,58 @@ var lock = new Auth0Lock(config.clientID, config.auth0Domain, {
 });
 ```
 
-5. 点击 **Save Changes**
+5. Click **Save Changes**
 
-### 4. 配置密码策略
+### 4. Configure Password Policy
 
-### 5. 配置密码确认
+### 5. Configure Password Confirmation
 
-**密码确认功能是 Auth0 内置的**：
+**Password confirmation is built into Auth0**:
 
-- Auth0 的注册表单默认要求用户输入密码两次
-- 无需额外配置，这是标准的安全实践
+- Auth0's registration form requires users to enter their password twice by default.
+- No additional configuration is needed; this is a standard security practice.
 
-如果你想要自定义密码验证规则：
+If you want to customize password validation rules:
 
-1. 进入 **Security** → **Attack Protection**
-2. 配置 **Brute Force Protection** 和 **Breached Password Detection**
+1. Go to **Security** → **Attack Protection**
+2. Configure **Brute Force Protection** and **Breached Password Detection**
 
 ---
 
-## 快速配置步骤总结
+## Quick Configuration Summary
 
-### 最简单的方法（推荐）：
+### Simplest Method (Recommended):
 
-1. **启用 New Universal Login**
-   - Branding → Universal Login → 选择 "New"
+1. **Enable New Universal Login**
+   - Branding → Universal Login → Select "New"
 
-2. **在 Database Connection 中启用名称字段**
-   - Authentication → Database → 点击你的连接
-   - Settings → 确保 "Disable Sign Ups" 未勾选
+2. **Enable Name Fields in Database Connection**
+   - Authentication → Database → Click your connection
+   - Settings → Ensure "Disable Sign Ups" is unchecked
 
-3. **配置注册表单显示名称字段**
-   - Branding → Universal Login → 点击 "Customize"
-   - 在 Signup 表单配置中启用 "Prompt for Name"
+3. **Configure Registration Form to Show Name Fields**
+   - Branding → Universal Login → Click "Customize"
+   - Enable "Prompt for Name" in the Signup form configuration
 
-4. **创建 Pre-User Registration Action**
+4. **Create Pre-User Registration Action**
    - Actions → Library → Build Custom
-   - 使用上面提供的代码保存 first_name 和 last_name
+   - Use the code provided above to save first_name and last_name
 
-5. **测试**
-   - 清除浏览器缓存
-   - 尝试注册新用户
-   - 检查是否显示 First Name 和 Last Name 字段
+5. **Test**
+   - Clear browser cache
+   - Try registering a new user
+   - Verify that First Name and Last Name fields are displayed
 
-## 获取注册后的用户信息
+## Retrieving User Information After Registration
 
-注册完成后，可以通过 Auth0 的 `userInfo` 端点获取用户的完整信息：
+After registration, you can retrieve complete user information via Auth0's `userInfo` endpoint:
 
 ```typescript
 const userInfo = await auth0.auth.userInfo({
   token: credentials.accessToken,
 });
 
-// userInfo 将包含：
+// userInfo will contain:
 // {
 //   sub: "auth0|...",
 //   email: "user@example.com",
@@ -202,37 +202,37 @@ const userInfo = await auth0.auth.userInfo({
 // }
 ```
 
-## 测试配置
+## Testing Configuration
 
-1. 清除应用缓存和 Auth0 session
-2. 重新打开注册页面
-3. 验证是否显示 first name 和 last name 字段
-4. 尝试提交空值，验证是否显示错误提示
-5. 输入不匹配的密码，验证是否提示密码不一致
+1. Clear app cache and Auth0 session
+2. Reopen the registration page
+3. Verify that first name and last name fields are displayed
+4. Try submitting empty values to verify error messages
+5. Enter mismatched passwords to verify the inconsistency prompt
 
-## 常见问题
+## FAQ
 
-### Q: 自定义字段的数据存储在哪里？
+### Q: Where is custom field data stored?
 
-A: Auth0 会将自定义字段存储在用户的 `user_metadata` 中。
+A: Auth0 stores custom fields in the user's `user_metadata`.
 
-### Q: 如何在后端 API 中获取这些字段？
+### Q: How do I access these fields in my backend API?
 
-A: 在 JWT token 的 claims 中包含这些信息，或者通过 Auth0 Management API 查询用户信息。
+A: Include this information in JWT token claims, or query user information via the Auth0 Management API.
 
-### Q: 密码策略在哪里配置？
+### Q: Where do I configure the password policy?
 
-A: **Security** → **Database** → 选择你的 Database Connection → **Password Policy**
+A: **Security** → **Database** → Select your Database Connection → **Password Policy**
 
-### Q: 如何自定义错误消息？
+### Q: How can I customize error messages?
 
-A: 在 Lock 配置的 `languageDictionary` 中添加自定义消息，或在 Universal Login 的 HTML 模板中修改。
+A: Add custom messages in the `languageDictionary` of the Lock configuration, or modify the HTML template in Universal Login.
 
-## 推荐配置
+## Recommended Configuration
 
-对于生产环境，推荐：
+For production environments, we recommend:
 
-1. 使用 **New Universal Login Experience**（更现代、安全）
-2. 配置强密码策略（至少 8 个字符，包含大小写字母和数字）
-3. 使用 **Actions** 处理额外的注册逻辑
-4. 启用 **Multi-Factor Authentication (MFA)** 提高安全性
+1. Using **New Universal Login Experience** (modern and secure)
+2. Configuring a strong password policy (at least 8 characters, including upper/lowercase and numbers)
+3. Using **Actions** to handle additional registration logic
+4. Enabling **Multi-Factor Authentication (MFA)** for enhanced security

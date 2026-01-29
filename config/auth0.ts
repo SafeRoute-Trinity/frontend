@@ -4,9 +4,9 @@ import { Platform } from 'react-native';
 // Get configuration from environment variables or constants
 // In production, it's recommended to use environment variables
 // Note: Domain should NOT include https://, just the domain name (e.g., your-tenant.auth0.com)
-const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
+const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferouteapp.eu.auth0.com';
 const AUTH0_CLIENT_ID =
-  process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID || 'mSrCz4yhWpbgyhOpK4gfB9a6lbMoM6ct';
+  process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID || 'ZHAiPyzoAyaaiKM0do7J05YNUrLgXFcG';
 
 export const auth0Config = {
   domain: AUTH0_DOMAIN,

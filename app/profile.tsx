@@ -111,7 +111,7 @@ const Profile = () => {
       setIsLoggingOut(true);
       await logout();
       router.replace('/login');
-    } catch (error) {
+    } catch {
       // console.error('Logout failed:', error);
     } finally {
       setIsLoggingOut(false);
