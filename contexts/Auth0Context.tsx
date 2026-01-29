@@ -1,8 +1,9 @@
 /* eslint-disable no-console */
-import * as SecureStore from 'expo-secure-store';
 import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
-import { Platform } from 'react-native';
+import { apiClient, AUTH_KEYS } from '../api/client';
 import { auth0Config, getAuth0 } from '../config/auth0';
+
+import { storage } from '../utils/storage';
 
 interface User {
   sub: string;
@@ -25,96 +26,6 @@ interface Auth0ContextType {
 
 const Auth0Context = createContext<Auth0ContextType | undefined>(undefined);
 
-const USER_KEY = 'auth0_user';
-const ACCESS_TOKEN_KEY = 'auth0_access_token';
-const REFRESH_TOKEN_KEY = 'auth0_refresh_token';
-
-// Simple storage implementation for web platform
-const simpleStore = {
-  async getItem(key: string): Promise<string | null> {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        return window.localStorage.getItem(key);
-      }
-      return null;
-    } catch {
-      return null;
-    }
-  },
-  async setItem(key: string, value: string): Promise<void> {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.setItem(key, value);
-      }
-    } catch {
-      // Ignore
-    }
-  },
-  async removeItem(key: string): Promise<void> {
-    try {
-      if (typeof window !== 'undefined' && window.localStorage) {
-        window.localStorage.removeItem(key);
-      }
-    } catch {
-      // Ignore
-    }
-  },
-};
-
-const getStoredItem = async (key: string): Promise<string | null> => {
-  if (Platform.OS === 'web') {
-    return simpleStore.getItem(key);
-  }
-  try {
-    return await SecureStore.getItemAsync(key);
-  } catch {
-    return null;
-  }
-};
-
-const setStoredItem = async (key: string, value: string): Promise<void> => {
-  if (Platform.OS === 'web') {
-    return simpleStore.setItem(key, value);
-  }
-  try {
-    await SecureStore.setItemAsync(key, value);
-  } catch {
-    // Ignore
-  }
-};
-
-const removeStoredItem = async (key: string): Promise<void> => {
-  if (Platform.OS === 'web') {
-    return simpleStore.removeItem(key);
-  }
-  try {
-    await SecureStore.deleteItemAsync(key);
-  } catch {
-    // Ignore
-  }
-};
-
-// Helper function to decode JWT token (does not verify signature)
-const decodeJWT = (token: string): any => {
-  try {
-    const parts = token.split('.');
-    if (parts.length !== 3) {
-      console.warn('Token is not a valid JWT (does not have 3 parts)');
-      return null;
-    }
-
-    // Decode the payload (second part)
-    const payload = parts[1];
-    const base64 = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const paddedBase64 = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
-    const decoded = atob(paddedBase64);
-    return JSON.parse(decoded);
-  } catch (err) {
-    console.error('Failed to decode JWT:', err);
-    return null;
-  }
-};
-
 export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -124,10 +35,14 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     async function loadUser() {
       try {
-        const storedUser = await getStoredItem(USER_KEY);
+        const storedUser = await storage.getItem(AUTH_KEYS.USER);
         if (storedUser) {
           setUser(JSON.parse(storedUser));
         }
+
+        // Optional: Verify session is valid by calling /v1/users/me silently
+        // If it fails with 401, we should probably logout or clear local state
+        // For now, we trust local storage to avoid blocking startup
       } catch (err) {
         console.error('Failed to load user:', err);
       } finally {
@@ -142,7 +57,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setError(null);
       setIsLoading(true);
 
-      console.log('ðŸ” Starting native login with email:', email);
+      console.log('🔍 Starting native login with email:', email);
 
       // Call Auth0 OAuth token endpoint with Resource Owner Password Grant
       const response = await fetch(`https://${auth0Config.domain}/oauth/token`, {
@@ -179,26 +94,19 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
 
       const credentials = await response.json();
       console.log('✅ Native login successful! Tokens received');
-      console.log(' Full credentials response:', JSON.stringify(credentials, null, 2));
-
-      // Decode and log the access token
-      if (credentials.access_token) {
-        const decodedToken = decodeJWT(credentials.access_token);
-        console.log(' Decoded access_token:', JSON.stringify(decodedToken, null, 2));
-      }
 
       // Save tokens
       if (credentials.access_token) {
-        await setStoredItem(ACCESS_TOKEN_KEY, credentials.access_token);
-        console.log('ðŸ’¾ Access token saved');
+        await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.access_token);
+        console.log('💾 Access token saved');
       }
       if (credentials.refresh_token) {
-        await setStoredItem(REFRESH_TOKEN_KEY, credentials.refresh_token);
-        console.log('ðŸ’¾ Refresh token saved');
+        await storage.setItem(AUTH_KEYS.REFRESH_TOKEN, credentials.refresh_token);
+        console.log('💾 Refresh token saved');
       }
 
-      // Get user information
-      console.log('ðŸ” Fetching user info...');
+      // Get user information from Auth0
+      console.log('🔍 Fetching user info from Auth0...');
       const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
         headers: {
           Authorization: `Bearer ${credentials.access_token}`,
@@ -206,20 +114,29 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       });
 
       if (!userInfoResponse.ok) {
-        throw new Error('âŒ Failed to fetch user information');
+        throw new Error('❌ Failed to fetch user information');
       }
 
       const userInfo = await userInfoResponse.json();
-      console.log('âœ… User info received:', { email: userInfo.email, sub: userInfo.sub });
+      console.log('✅ User info received:', { email: userInfo.email, sub: userInfo.sub });
 
       setUser(userInfo);
-      await setStoredItem(USER_KEY, JSON.stringify(userInfo));
+      await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
 
-      console.log('âœ… Native login complete! User:', userInfo.email || userInfo.sub);
+      // VERIFICATION: Verify backend connection by calling a protected endpoint
+      console.log('🔍 Verified Backend Connection: Calling /v1/users/me...');
+      try {
+        await apiClient.get('/v1/users/me');
+        console.log('✅ Backend verification successful!');
+      } catch (backendErr) {
+        console.error('❌ Backend verification failed:', backendErr);
+      }
+
+      console.log('✅ Native login complete! User:', userInfo.email || userInfo.sub);
     } catch (err: any) {
       setError(err);
-      console.error('âŒ Native login error:', err);
-      console.error('âŒ Error message:', err.message);
+      console.error('❌ Native login error:', err);
+      console.error('❌ Error message:', err.message);
       throw err; // Re-throw so the login page can handle it
     } finally {
       setIsLoading(false);
@@ -231,7 +148,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setError(null);
       setIsLoading(true);
 
-      console.log('ðŸ” Starting login process...', { showSignup, forceLogin });
+      console.log('🔍 Starting login process...', { showSignup, forceLogin });
 
       const auth0 = getAuth0();
       if (!auth0) {
@@ -242,7 +159,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
 
       const redirectUri = 'saferouteapp://auth/callback';
 
-      console.log('ðŸ” Calling auth0.webAuth.authorize with:', {
+      console.log('🔍 Calling auth0.webAuth.authorize with:', {
         scope: 'openid profile email offline_access',
         redirectUri,
         prompt: 'login',
@@ -260,8 +177,6 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
             ? {
                 screen_hint: 'signup',
                 // Additional metadata for signup - these will be available in Auth0 Actions
-                // To use these fields, configure them in Auth0 Dashboard:
-                // See AUTH0_CUSTOM_SIGNUP.md for detailed instructions
                 login_hint: 'Please provide your full name and ensure passwords match',
               }
             : {}),
@@ -273,8 +188,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // Wait for 5 seconds to see if WebView loads
       const timeoutPromise = new Promise((_, reject) => {
         setTimeout(() => {
-          console.log('â±ï¸ 5 seconds elapsed - WebView might be stuck on blank page');
-          console.log('âš ï¸ If you see a blank page, this indicates a network or WebView issue');
+          console.log('⏳ 5 seconds elapsed - WebView might be stuck on blank page');
         }, 5000);
       });
 
@@ -284,57 +198,46 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // Use Auth0 webAuth for login or signup
       const credentials = await authorizePromise;
 
-      console.log('âœ… Authorization completed! Credentials received:', {
-        hasAccessToken: !!credentials.accessToken,
-        hasRefreshToken: !!credentials.refreshToken,
-        tokenType: credentials.tokenType,
-      });
+      console.log('✅ Authorization completed! Credentials received');
 
       // Save tokens
       if (credentials.accessToken) {
-        await setStoredItem(ACCESS_TOKEN_KEY, credentials.accessToken);
-        console.log('ðŸ’¾ Access token saved');
+        await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.accessToken);
+        console.log('💾 Access token saved');
       }
       if (credentials.refreshToken) {
-        await setStoredItem(REFRESH_TOKEN_KEY, credentials.refreshToken);
-        console.log('ðŸ’¾ Refresh token saved');
+        await storage.setItem(AUTH_KEYS.REFRESH_TOKEN, credentials.refreshToken);
+        console.log('💾 Refresh token saved');
       }
 
-      console.log('ðŸ” Fetching user info...');
+      console.log('🔍 Fetching user info...');
       // Get user information
       const userInfo = await auth0.auth.userInfo({
         token: credentials.accessToken,
       });
 
-      console.log('âœ… User info received:', { email: userInfo.email, sub: userInfo.sub });
+      console.log('✅ User info received:', { email: userInfo.email, sub: userInfo.sub });
 
       setUser(userInfo);
-      await setStoredItem(USER_KEY, JSON.stringify(userInfo));
+      await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
 
-      console.log('âœ… Login successful! User:', userInfo.email || userInfo.sub);
-      console.log('âœ… isAuthenticated will be:', !!userInfo);
+      console.log('✅ Login successful! User:', userInfo.email || userInfo.sub);
     } catch (err: any) {
       // User cancellation is not considered an error
       if (err.error !== 'a0.session.user_cancelled') {
         setError(err);
-        console.error('âŒ Login error:', err);
-        console.error('âŒ Error details:', JSON.stringify(err, null, 2));
-        console.error('âŒ Error message:', err.message);
-        console.error('âŒ Error code:', err.code);
+        console.error('❌ Login error:', err);
 
         // Provide helpful error message for blank page issue
         if (err.message && err.message.includes('network')) {
-          console.error('ðŸ’¡ Network error detected. Please check:');
-          console.error('   1. Android emulator has internet connection');
-          console.error('   2. Auth0 domain is accessible from emulator');
-          console.error('   3. Try accessing https://saferoute.eu.auth0.com in Chrome on emulator');
+          console.error('💡 Network error detected. Please check emulator internet connection.');
         }
       } else {
-        console.log('â„¹ï¸ User cancelled login');
+        console.log('ℹ️ User cancelled login');
       }
     } finally {
       setIsLoading(false);
-      console.log('ðŸ” Login process finished');
+      console.log('🔍 Login process finished');
     }
   };
 
@@ -354,20 +257,15 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setError(null);
       setIsLoading(true);
 
-      // For native login, we don't need to clear Auth0 WebView session
-      // Just clear local storage
-
-      // Clear stored tokens and user data
-      await removeStoredItem(ACCESS_TOKEN_KEY);
-      await removeStoredItem(REFRESH_TOKEN_KEY);
-      await removeStoredItem(USER_KEY);
-
-      // Clear user state - this will trigger UI update
+      // 1. Clear stored tokens and user data
+      await storage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+      await storage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
+      await storage.removeItem(AUTH_KEYS.USER);
+      // 2. Clear user state - this will trigger UI update
       setUser(null);
 
-      console.log('âœ… Logout complete');
+      console.log('✅ Logout complete');
     } catch (err) {
-      // Even if there's an error, try to clear user state
       setError(err as Error);
       console.error('Logout error:', err);
       setUser(null);
