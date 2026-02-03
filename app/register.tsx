@@ -245,7 +245,7 @@ const Register = () => {
       }
 
       // Registration successful
-      const data = await response.json();
+      await response.json();
       // console.log('Registration successful:', data);
 
       // Show success message and redirect to login
