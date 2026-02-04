@@ -5,17 +5,13 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
-  Modal,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { initializeMapbox, mapboxConfig } from '../config/mapbox';
-import { useAuth0 } from '../contexts/Auth0Context';
+import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
 
 // Initialize Mapbox with access token
 const MAPBOX_ACCESS_TOKEN = mapboxConfig.accessToken;
@@ -63,122 +59,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     padding: 16,
-  },
-  avatarContainer: {
-    position: 'absolute',
-    top: 110,
-    right: 16,
-    zIndex: 1001,
-    alignItems: 'flex-end',
-  },
-  avatarWithMenu: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  avatarButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  menuButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  menuIcon: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#1F2937',
-    lineHeight: 20,
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
-  },
-  avatarPlaceholder: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarPlaceholderText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  loginAvatarButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#2563EB',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  loginAvatarText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
-  },
-  healthButton: {
-    width: 50,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: '#6B7280',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 8,
-    borderWidth: 1,
-    borderColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  healthButtonText: {
-    color: '#FFFFFF',
-    fontSize: 9,
-    fontWeight: '500',
-  },
-  buttonPressed: {
-    opacity: 0.85,
   },
   markerContainer: {
     alignItems: 'center',
@@ -416,7 +296,7 @@ const styles = StyleSheet.create({
   },
   searchContainer: {
     position: 'absolute',
-    top: 110,
+    top: 100,
     left: 16,
     right: 16,
     zIndex: 1000,
@@ -478,58 +358,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1F2937',
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 110,
-    paddingRight: 16,
-  },
-  menuContainer: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    minWidth: 200,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
-    overflow: 'hidden',
-  },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    gap: 12,
-  },
-  menuItemPressed: {
-    backgroundColor: '#F3F4F6',
-  },
-  menuItemIcon: {
-    fontSize: 18,
-  },
-  menuItemText: {
-    fontSize: 16,
-    color: '#1F2937',
-    fontWeight: '500',
-  },
-  menuDivider: {
-    height: 1,
-    backgroundColor: '#E5E7EB',
-  },
-  logoutText: {
-    color: '#DC2626',
+  buttonPressed: {
+    opacity: 0.85,
   },
 });
 
 const Index = () => {
   const router = useRouter();
-  const { isAuthenticated, user, logout } = useAuth0();
   const [location, setLocation] = useState<LocationData | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
@@ -542,13 +377,11 @@ const Index = () => {
   const [isSearching, setIsSearching] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(null);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [showAccountMenu, setShowAccountMenu] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [routeData, setRouteData] = useState<any>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeStart, setRouteStart] = useState<[number, number] | null>(null); // [longitude, latitude]
-  const [routeEnd, setRouteEnd] = useState<[number, number] | null>(null); // [longitude, latitude]
+  const [routeStart, setRouteStart] = useState<[number, number] | null>(null);
+  const [routeEnd, setRouteEnd] = useState<[number, number] | null>(null);
   const cameraRef = useRef<Camera>(null);
   const [centerCoordinate, setCenterCoordinate] = useState<[number, number] | null>(null);
 
@@ -563,7 +396,6 @@ const Index = () => {
         setIsLoadingLocation(true);
         setLocationError(null);
 
-        // Request location permissions
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           setLocationError('Location permission denied');
@@ -571,7 +403,6 @@ const Index = () => {
           return;
         }
 
-        // Get current location
         const currentLocation = await Location.getCurrentPositionAsync({
           accuracy: Location.Accuracy.High,
         });
@@ -601,13 +432,11 @@ const Index = () => {
     setZoomLevel(newZoom);
   };
 
-  // Center map on current location
   const handleCenterOnLocation = () => {
     if (location && cameraRef.current) {
       const coord: [number, number] = [location.longitude, location.latitude];
       setCenterCoordinate(coord);
-      setSelectedLocation(null); // Clear any selected location
-      // Use camera ref to programmatically move the camera
+      setSelectedLocation(null);
       cameraRef.current.setCamera({
         centerCoordinate: coord,
         zoomLevel,
@@ -629,7 +458,6 @@ const Index = () => {
     longPressStartTimeRef.current = Date.now();
     setLongPressProgress(0);
 
-    // Update progress every 100ms
     longPressTimerRef.current = setInterval(() => {
       if (longPressStartTimeRef.current) {
         const elapsed = Date.now() - longPressStartTimeRef.current;
@@ -637,7 +465,6 @@ const Index = () => {
         setLongPressProgress(progress);
 
         if (elapsed >= LONG_PRESS_DURATION) {
-          // Navigate to health page
           router.push('/health');
           handleLongPressEnd();
         }
@@ -645,7 +472,6 @@ const Index = () => {
     }, 100);
   };
 
-  // Search for places using Mapbox Geocoding API
   const searchPlaces = async (query: string) => {
     if (!query.trim() || !MAPBOX_ACCESS_TOKEN) {
       setSearchResults([]);
@@ -670,14 +496,12 @@ const Index = () => {
         );
       }
     } catch {
-      // console.error('Search error:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  // Handle search input with debounce
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -685,7 +509,7 @@ const Index = () => {
 
     searchTimeoutRef.current = setTimeout(() => {
       searchPlaces(searchQuery);
-    }, 500); // 500ms debounce
+    }, 500);
 
     return () => {
       if (searchTimeoutRef.current) {
@@ -694,16 +518,14 @@ const Index = () => {
     };
   }, [searchQuery]);
 
-  // Handle location selection
   const handleSelectLocation = (result: SearchResult) => {
     const [longitude, latitude] = result.center;
     const coord: [number, number] = [longitude, latitude];
     setSelectedLocation({ latitude, longitude });
     setZoomLevel(15);
-    setCenterCoordinate(coord); // Update center coordinate to trigger camera movement
+    setCenterCoordinate(coord);
     setSearchQuery('');
     setSearchResults([]);
-    // Use camera ref to programmatically move the camera
     if (cameraRef.current) {
       cameraRef.current.setCamera({
         centerCoordinate: coord,
@@ -713,49 +535,12 @@ const Index = () => {
     }
   };
 
-  // Handle logout
-  const handleLogout = async () => {
-    try {
-      setIsLoggingOut(true);
-      await logout();
-      setShowAccountMenu(false);
-      router.push('/');
-    } catch {
-      // console.error('Logout failed:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-
-  /* 
-  // Handle switch account
-  const handleSwitchAccount = async () => {
-    try {
-      setIsLoggingOut(true);
-      setShowAccountMenu(false);
-
-      // Clear local storage and Auth0 session
-      await logout();
-
-      // Navigate to login and force show login form
-      router.push('/login?forceLogin=true');
-    } catch {
-      // console.error('Switch account failed:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
-  };
-  */
-
-  // Test OpenRouter API
   const handleTestRoute = async () => {
-    // Build URL with properly formatted coordinates (no spaces after comma)
     const startLat = 53.341878714221885;
     const startLon = -6.2522456843725545;
     const endLat = 53.34446845655061;
     const endLon = -6.259457236376844;
 
-    // Try different URL formats in case the API expects a specific format
     const baseUrl = 'https://saferoutemap.duckdns.org/route';
     const url1 = `${baseUrl}?start=${startLat},${startLon}&end=${endLat},${endLon}&profile=foot-walking`;
     const url2 = `${baseUrl}?start=${startLat}%2C${startLon}&end=${endLat}%2C${endLon}&profile=foot-walking`;
@@ -764,12 +549,9 @@ const Index = () => {
       setIsLoadingRoute(true);
       setRouteError(null);
 
-      // Try first URL format
       let response = await fetch(url1);
 
-      // If 404, try second format
       if (!response.ok && response.status === 404) {
-        // console.log('Trying alternative URL format...');
         response = await fetch(url2);
       }
 
@@ -780,20 +562,16 @@ const Index = () => {
 
       const data = await response.json();
 
-      // The response should be in Mapbox-compatible GeoJSON format
-      // Based on the expected response, it's already a FeatureCollection
       let finalRouteData: any;
 
       if (data.type === 'FeatureCollection') {
         finalRouteData = data;
       } else if (data.type === 'Feature') {
-        // Wrap single Feature in FeatureCollection
         finalRouteData = {
           type: 'FeatureCollection',
           features: [data],
         };
       } else if (data.geometry || data.coordinates) {
-        // If it has geometry/coordinates, wrap it in a Feature
         finalRouteData = {
           type: 'FeatureCollection',
           features: [
@@ -808,7 +586,6 @@ const Index = () => {
           ],
         };
       } else {
-        // Try to extract route from common formats
         const routeGeometry = data.routes?.[0]?.geometry || data.geometry;
         if (routeGeometry) {
           finalRouteData = {
@@ -826,15 +603,14 @@ const Index = () => {
         }
       }
 
-      // Extract start and end coordinates from the route
       const firstFeature = finalRouteData.features?.[0];
       if (
         firstFeature?.geometry?.type === 'LineString' &&
         firstFeature.geometry.coordinates?.length > 0
       ) {
         const { coordinates } = firstFeature.geometry;
-        const startCoord = coordinates[0]; // [longitude, latitude]
-        const endCoord = coordinates[coordinates.length - 1]; // [longitude, latitude]
+        const startCoord = coordinates[0];
+        const endCoord = coordinates[coordinates.length - 1];
 
         setRouteStart(startCoord as [number, number]);
         setRouteEnd(endCoord as [number, number]);
@@ -842,7 +618,6 @@ const Index = () => {
 
       setRouteData(finalRouteData);
     } catch (error) {
-      // console.error('Route API error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to load route';
       setRouteError(errorMessage);
       setRouteData(null);
@@ -851,7 +626,6 @@ const Index = () => {
     }
   };
 
-  // Cleanup on unmount
   useEffect(
     () => () => {
       if (longPressTimerRef.current) {
@@ -936,7 +710,6 @@ const Index = () => {
               </View>
             </PointAnnotation>
           )}
-          {/* Route Line */}
           {routeData && (
             <ShapeSource id="routeSource" shape={routeData}>
               <LineLayer
@@ -949,7 +722,6 @@ const Index = () => {
               />
             </ShapeSource>
           )}
-          {/* Start Marker */}
           {routeStart && (
             <PointAnnotation id="route-start" coordinate={routeStart} title="Route Start">
               <View style={styles.markerContainer}>
@@ -957,7 +729,6 @@ const Index = () => {
               </View>
             </PointAnnotation>
           )}
-          {/* End Marker */}
           {routeEnd && (
             <PointAnnotation id="route-end" coordinate={routeEnd} title="Route End">
               <View style={styles.markerContainer}>
@@ -971,12 +742,12 @@ const Index = () => {
 
     return null;
   };
+
   return (
     <View style={styles.container}>
-      {/* Full Screen Map */}
       <View style={styles.mapContainer}>{renderMapContent()}</View>
 
-      {/* Top Header */}
+      {/* Top Header with long-press for health page */}
       <View style={styles.topHeader}>
         <Pressable
           onPressIn={handleLongPressStart}
@@ -1027,91 +798,6 @@ const Index = () => {
           </View>
         )}
       </View>
-
-      {/* User Avatar */}
-      <View style={styles.avatarContainer}>
-        {isAuthenticated && user ? (
-          <Pressable onPress={() => setShowAccountMenu(true)} style={styles.avatarButton}>
-            {user.picture ? (
-              <Image source={{ uri: user.picture }} style={styles.avatarImage} />
-            ) : (
-              <View style={styles.avatarPlaceholder}>
-                <Text style={styles.avatarPlaceholderText}>
-                  {user.name?.charAt(0).toUpperCase() || 'U'}
-                </Text>
-              </View>
-            )}
-          </Pressable>
-        ) : (
-          <>
-            <Pressable
-              style={({ pressed }) => [styles.loginAvatarButton, pressed && styles.buttonPressed]}
-              onPress={() => router.push('/login')}
-            >
-              <Text style={styles.loginAvatarText}>Login</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [styles.healthButton, pressed && styles.buttonPressed]}
-              onPress={() => router.push('/health')}
-            >
-              <Text style={styles.healthButtonText}>Health</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-
-      {/* Account Menu Modal */}
-      <Modal
-        visible={showAccountMenu}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowAccountMenu(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowAccountMenu(false)}
-        >
-          <View style={styles.menuContainer}>
-            <Pressable
-              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
-              onPress={() => {
-                setShowAccountMenu(false);
-                router.push('/profile');
-              }}
-            >
-              <Text style={styles.menuItemIcon}>👤</Text>
-              <Text style={styles.menuItemText}>View Profile</Text>
-            </Pressable>
-            {/* Switch Account button hidden */}
-            {/* <View style={styles.menuDivider} />
-            <Pressable
-              style={({ pressed }) => [
-                styles.menuItem,
-                pressed && styles.menuItemPressed,
-              ]}
-              onPress={handleSwitchAccount}
-              disabled={isLoggingOut}
-            >
-              <Text style={styles.menuItemIcon}>🔄</Text>
-              <Text style={styles.menuItemText}>
-                {isLoggingOut ? "Switching..." : "Switch Account"}
-              </Text>
-            </Pressable> */}
-            <View style={styles.menuDivider} />
-            <Pressable
-              style={({ pressed }) => [styles.menuItem, pressed && styles.menuItemPressed]}
-              onPress={handleLogout}
-              disabled={isLoggingOut}
-            >
-              <Text style={styles.menuItemIcon}>🚪</Text>
-              <Text style={[styles.menuItemText, styles.logoutText]}>
-                {isLoggingOut ? 'Logging out...' : 'Logout'}
-              </Text>
-            </Pressable>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Route Test Button */}
       {location && (

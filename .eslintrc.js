@@ -21,6 +21,7 @@ module.exports = {
     'no-underscore-dangle': 'off',
     'global-require': 'off', // Common in React Native for images
     'react/style-prop-object': 'off', // Conflict with Expo StatusBar
+    'react/require-default-props': 'off', // Use TypeScript default parameters instead
   },
   ignorePatterns: ['dist/*', 'node_modules/*', '.expo/*', 'scripts/*', '*.config.js'],
 };
