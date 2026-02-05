@@ -1,6 +1,7 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { Routes } from '../constants/routes';
 import { colors } from '../constants/theme';
 import { Auth0Provider, useAuth0 } from '../contexts/Auth0Context';
 
@@ -25,10 +26,10 @@ const RootLayoutNav = () => {
 
     if (isAuthenticated && !inTabsGroup) {
       // Authenticated user trying to access auth screens or root, redirect to tabs
-      router.replace('/(tabs)');
+      router.replace(Routes.TABS);
     } else if (!isAuthenticated && inTabsGroup) {
       // Unauthenticated user trying to access protected tabs, redirect to login
-      router.replace('/login');
+      router.replace(Routes.LOGIN);
     }
   }, [isAuthenticated, isLoading, segments, router]);
 

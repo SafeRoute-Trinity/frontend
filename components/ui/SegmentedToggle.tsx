@@ -1,8 +1,8 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors } from '../../constants/theme';
 
-interface SegmentedToggleProps {
-  options: [string, string];
+interface ISegmentedToggle {
+  options: string[];
   selectedIndex: number;
   onSelect: (index: number) => void;
   label?: string;
@@ -10,47 +10,43 @@ interface SegmentedToggleProps {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    marginBottom: 8,
   },
   label: {
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
     color: colors.textPrimary,
+    marginBottom: 12,
   },
   toggleContainer: {
     flexDirection: 'row',
-    backgroundColor: colors.border,
-    borderRadius: 20,
-    padding: 3,
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    padding: 4,
   },
   option: {
-    paddingVertical: 8,
+    flex: 1,
+    paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 17,
-    minWidth: 56,
+    borderRadius: 8,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   optionSelected: {
-    backgroundColor: colors.textPrimary,
+    backgroundColor: colors.surface,
   },
   optionText: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '500',
-    color: colors.textSecondary,
+    color: colors.textMuted,
   },
   optionTextSelected: {
-    color: colors.background,
+    color: colors.textPrimary,
+    fontWeight: '600',
   },
 });
 
-const SegmentedToggle = ({
-  options,
-  selectedIndex,
-  onSelect,
-  label = undefined,
-}: SegmentedToggleProps) => (
+const SegmentedToggle = ({ options, selectedIndex, onSelect, label }: ISegmentedToggle) => (
   <View style={styles.container}>
     {label && <Text style={styles.label}>{label}</Text>}
     <View style={styles.toggleContainer}>

@@ -1,10 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import type { ITrustedContact } from '../../constants/mockData';
 import { colors } from '../../constants/theme';
-import type { TrustedContact } from '../../constants/mockData';
 
-interface ContactCardProps {
-  contact: TrustedContact;
+interface IContactCard {
+  contact: ITrustedContact;
   onCall?: () => void;
   onMore?: () => void;
 }
@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const ContactCard = ({ contact, onCall = undefined, onMore = undefined }: ContactCardProps) => (
+const ContactCard = ({ contact, onCall, onMore }: IContactCard) => (
   <View style={styles.container}>
     {contact.avatarUrl ? (
       <Image source={{ uri: contact.avatarUrl }} style={styles.avatar} />

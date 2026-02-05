@@ -1,16 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
+import { TabNames } from '../../constants/routes';
 import { colors } from '../../constants/theme';
 
-const MapIcon = ({ color, size }: { color: string; size: number }) => (
-  <Ionicons name="map" size={size} color={color} />
-);
+interface IIcon {
+  color: string;
+  size: number;
+}
 
-const AlertsIcon = ({ color, size }: { color: string; size: number }) => (
+const MapIcon = ({ color, size }: IIcon) => <Ionicons name="map" size={size} color={color} />;
+
+const AlertsIcon = ({ color, size }: IIcon) => (
   <Ionicons name="notifications" size={size} color={color} />
 );
 
-const ProfileIcon = ({ color, size }: { color: string; size: number }) => (
+const ProfileIcon = ({ color, size }: IIcon) => (
   <Ionicons name="person" size={size} color={color} />
 );
 
@@ -35,36 +39,36 @@ const TabLayout = () => (
     }}
   >
     <Tabs.Screen
-      name="index"
+      name={TabNames.INDEX}
       options={{
         title: 'Map',
         tabBarIcon: MapIcon,
       }}
     />
     <Tabs.Screen
-      name="alerts"
+      name={TabNames.ALERTS}
       options={{
         title: 'Alerts',
         tabBarIcon: AlertsIcon,
       }}
     />
     <Tabs.Screen
-      name="profile"
+      name={TabNames.PROFILE}
       options={{
         title: 'Profile',
         tabBarIcon: ProfileIcon,
       }}
     />
     <Tabs.Screen
-      name="personal-info"
+      name={TabNames.PERSONAL_INFO}
       options={{
-        href: null, // Hide from tab bar
+        href: null,
       }}
     />
     <Tabs.Screen
-      name="help"
+      name={TabNames.HELP}
       options={{
-        href: null, // Hide from tab bar
+        href: null,
       }}
     />
   </Tabs>

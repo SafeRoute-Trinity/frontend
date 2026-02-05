@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
+import { ReactNode } from 'react';
 import { StyleSheet } from 'react-native';
 import { colors } from '../../constants/theme';
 
-interface GradientBackgroundProps {
-  children: React.ReactNode;
+interface IGradientBackground {
+  children: ReactNode;
 }
 
 const styles = StyleSheet.create({
@@ -12,7 +13,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const GradientBackground = ({ children }: GradientBackgroundProps) => (
+const GradientBackground = ({ children }: IGradientBackground) => (
   <LinearGradient
     colors={[colors.gradientStart, colors.gradientMiddle, colors.gradientEnd]}
     locations={[0, 0.5, 1]}

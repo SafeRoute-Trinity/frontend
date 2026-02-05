@@ -1,4 +1,4 @@
-export interface TrustedContact {
+export interface ITrustedContact {
   id: string;
   name: string;
   role: string;
@@ -7,7 +7,7 @@ export interface TrustedContact {
   avatarUrl?: string;
 }
 
-export const mockContacts: TrustedContact[] = [
+export const mockContacts: ITrustedContact[] = [
   {
     id: '1',
     name: 'Sarah Thompson',

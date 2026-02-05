@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -11,18 +11,27 @@ import {
   View,
 } from 'react-native';
 import GradientBackground from '../../components/ui/GradientBackground';
+import { Routes } from '../../constants/routes';
 import { colors } from '../../constants/theme';
 import { useAuth0 } from '../../contexts/Auth0Context';
+
+interface IInfoField {
+  label: string;
+  value: string;
+  editable?: boolean;
+  onChangeText?: (text: string) => void;
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  scrollContent: {
+    paddingBottom: 100,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingTop: 50,
     paddingHorizontal: 20,
     paddingBottom: 16,
@@ -41,15 +50,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.textPrimary,
-  },
-  headerPlaceholder: {
-    width: 40,
-  },
-  scrollContent: {
-    paddingHorizontal: 20,
-    paddingBottom: 100,
+    marginLeft: 12,
   },
   section: {
+    paddingHorizontal: 20,
     marginTop: 24,
   },
   sectionTitle: {
@@ -84,64 +88,63 @@ const styles = StyleSheet.create({
   fieldValue: {
     fontSize: 16,
     color: colors.textPrimary,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
     backgroundColor: colors.background,
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  fieldInput: {
-    fontSize: 16,
-    color: colors.textPrimary,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    backgroundColor: colors.background,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
+  fieldValueEditable: {
+    borderColor: colors.accent,
   },
-  fieldInputFocused: {
-    borderColor: colors.primary,
+  fieldValueDisabled: {
+    color: colors.textSecondary,
   },
-  fieldReadOnly: {
-    opacity: 0.6,
-  },
-  fieldHelper: {
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 6,
-  },
-  timestampRow: {
+  timestampContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  timestampContainerLast: {
+    borderBottomWidth: 0,
   },
   timestampLabel: {
     fontSize: 14,
-    color: colors.textSecondary,
+    color: colors.textMuted,
   },
   timestampValue: {
     fontSize: 14,
-    color: colors.textMuted,
+    color: colors.textPrimary,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
+  accountIdContainer: {
+    marginTop: 24,
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  accountIdLabel: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: 4,
+  },
+  accountIdValue: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontFamily: 'monospace',
   },
   saveButton: {
     backgroundColor: colors.accent,
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
+    marginHorizontal: 20,
     marginTop: 24,
+    alignItems: 'center',
   },
   saveButtonDisabled: {
-    opacity: 0.6,
-  },
-  saveButtonPressed: {
-    opacity: 0.8,
+    backgroundColor: colors.border,
   },
   saveButtonText: {
     fontSize: 16,
@@ -152,167 +155,144 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.background,
   },
 });
+
+const InfoField = ({ label, value, editable, onChangeText }: IInfoField) => (
+  <View style={styles.fieldContainer}>
+    <Text style={styles.fieldLabel}>{label}</Text>
+    {editable && onChangeText ? (
+      <TextInput
+        style={[styles.fieldValue, styles.fieldValueEditable]}
+        value={value}
+        onChangeText={onChangeText}
+        placeholderTextColor={colors.textMuted}
+      />
+    ) : (
+      <Text style={[styles.fieldValue, styles.fieldValueDisabled]}>{value}</Text>
+    )}
+  </View>
+);
 
 const PersonalInfo = () => {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth0();
-
-  // Editable fields
-  const [name, setName] = useState(user?.name || '');
-  const [phone, setPhone] = useState(user?.phone || '');
+  const [name, setName] = useState<string | undefined>(undefined);
+  const [phone, setPhone] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
 
-  // Mock timestamps - in production these would come from user metadata/API
-  const createdAt = 'October 15, 2023';
-  const updatedAt = 'January 28, 2025';
-  const lastLogin = 'February 4, 2025';
-
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      // TODO: Call API to update user info
-      // await api.put('/users/me', { name, phone });
-
-      // Simulate API call
-      await new Promise<void>((resolve) => {
-        setTimeout(resolve, 1000);
-      });
-
-      router.back();
-    } finally {
-      setIsSaving(false);
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setPhone(user.phone);
     }
+  }, [user]);
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
-  const hasChanges = name !== (user?.name || '') || phone !== (user?.phone || '');
+  const hasChanges = name !== user?.name || phone !== user?.phone;
+
+  const handleSave = async () => {
+    if (!hasChanges) return;
+    setIsSaving(true);
+    // Simulate API call
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+    // TODO: Implement actual save logic
+    console.log('Saving changes:', { name, phone });
+    setIsSaving(false);
+  };
 
   if (authLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <GradientBackground>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </GradientBackground>
     );
   }
 
   if (!isAuthenticated || !user) {
-    router.replace('/login');
+    router.replace(Routes.LOGIN);
     return null;
   }
 
   return (
     <GradientBackground>
-      {/* Header */}
-      <View style={styles.header}>
-        <Pressable
-          style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
-          onPress={() => router.back()}
-        >
-          <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>Personal Information</Text>
-        <View style={styles.headerPlaceholder} />
-      </View>
+      <View style={styles.container}>
+        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable
+              style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
+              onPress={() => router.back()}
+            >
+              <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
+            </Pressable>
+            <Text style={styles.headerTitle}>Personal Information</Text>
+          </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Editable Information */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Details</Text>
-          <View style={styles.card}>
-            {/* Email - Read Only */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Email</Text>
-              <Text style={[styles.fieldValue, styles.fieldReadOnly]}>{user.email || 'N/A'}</Text>
-              <Text style={styles.fieldHelper}>Email cannot be changed</Text>
-            </View>
-
-            {/* Name - Editable */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.fieldLabel}>Full Name</Text>
-              <TextInput
-                style={[styles.fieldInput, focusedField === 'name' && styles.fieldInputFocused]}
-                value={name}
-                onChangeText={setName}
-                onFocus={() => setFocusedField('name')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="Enter your name"
-                placeholderTextColor={colors.textMuted}
-                autoCapitalize="words"
-              />
-            </View>
-
-            {/* Phone - Editable */}
-            <View style={[styles.fieldContainer, styles.fieldContainerLast]}>
-              <Text style={styles.fieldLabel}>Phone Number</Text>
-              <TextInput
-                style={[styles.fieldInput, focusedField === 'phone' && styles.fieldInputFocused]}
-                value={phone}
-                onChangeText={setPhone}
-                onFocus={() => setFocusedField('phone')}
-                onBlur={() => setFocusedField(null)}
-                placeholder="+1 (555) 000-0000"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="phone-pad"
-              />
-              <Text style={styles.fieldHelper}>Used for emergency contacts and SOS alerts</Text>
+          {/* Contact Information */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Contact Information</Text>
+            <View style={styles.card}>
+              <InfoField label="Email" value={user.email ?? 'Not provided'} editable={false} />
+              <InfoField label="Full Name" value={name ?? ''} editable onChangeText={setName} />
+              <View style={styles.fieldContainerLast}>
+                <InfoField label="Phone" value={phone ?? ''} editable onChangeText={setPhone} />
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* Account Timestamps */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Activity</Text>
-          <View style={styles.card}>
-            <View style={styles.timestampRow}>
-              <Text style={styles.timestampLabel}>Account Created</Text>
-              <Text style={styles.timestampValue}>{createdAt}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.timestampRow}>
-              <Text style={styles.timestampLabel}>Last Updated</Text>
-              <Text style={styles.timestampValue}>{updatedAt}</Text>
-            </View>
-            <View style={styles.divider} />
-            <View style={styles.timestampRow}>
-              <Text style={styles.timestampLabel}>Last Login</Text>
-              <Text style={styles.timestampValue}>{lastLogin}</Text>
+          {/* Account Information */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Account Information</Text>
+            <View style={styles.card}>
+              <View style={styles.timestampContainer}>
+                <Text style={styles.timestampLabel}>Account created</Text>
+                <Text style={styles.timestampValue}>{formatDate(user.created_at)}</Text>
+              </View>
+              <View style={styles.timestampContainer}>
+                <Text style={styles.timestampLabel}>Last updated</Text>
+                <Text style={styles.timestampValue}>{formatDate(user.updated_at)}</Text>
+              </View>
+              <View style={[styles.timestampContainer, styles.timestampContainerLast]}>
+                <Text style={styles.timestampLabel}>Last login</Text>
+                <Text style={styles.timestampValue}>{formatDate(user.last_login)}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        {/* User ID - For reference */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account ID</Text>
-          <View style={styles.card}>
-            <View style={[styles.fieldContainer, styles.fieldContainerLast]}>
-              <Text style={[styles.fieldValue, styles.fieldReadOnly]}>{user.sub || 'N/A'}</Text>
-              <Text style={styles.fieldHelper}>Your unique account identifier</Text>
-            </View>
+          {/* Account ID */}
+          <View style={styles.accountIdContainer}>
+            <Text style={styles.accountIdLabel}>Account ID</Text>
+            <Text style={styles.accountIdValue}>{user.sub}</Text>
           </View>
-        </View>
+        </ScrollView>
 
         {/* Save Button */}
         {hasChanges && (
           <Pressable
-            style={({ pressed }) => [
-              styles.saveButton,
-              isSaving && styles.saveButtonDisabled,
-              pressed && styles.saveButtonPressed,
-            ]}
+            style={[styles.saveButton, isSaving && styles.saveButtonDisabled]}
             onPress={handleSave}
             disabled={isSaving}
           >
-            {isSaving ? (
-              <ActivityIndicator size="small" color={colors.textPrimary} />
-            ) : (
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            )}
+            <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Changes'}</Text>
           </Pressable>
         )}
-      </ScrollView>
+      </View>
     </GradientBackground>
   );
 };
