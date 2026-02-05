@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import GradientBackground from '../../components/ui/GradientBackground';
-import { InputFocusType } from '../../constants/routes';
+import { InputFocus, InputFocusType } from '../../constants/routes';
 import { colors } from '../../constants/theme';
 
 interface IHelpMenuItem {
@@ -297,13 +297,16 @@ const Help = () => {
               </View>
               <Text style={styles.modalLabel}>How can we help you?</Text>
               <TextInput
-                style={[styles.modalInput, inputFocused === 'help' && styles.modalInputFocused]}
+                style={[
+                  styles.modalInput,
+                  inputFocused === InputFocus.HELP && styles.modalInputFocused,
+                ]}
                 placeholder="Describe your issue or question..."
                 placeholderTextColor={colors.textMuted}
                 multiline
                 value={helpQuery}
                 onChangeText={setHelpQuery}
-                onFocus={() => setInputFocused('help')}
+                onFocus={() => setInputFocused(InputFocus.HELP)}
                 onBlur={() => setInputFocused(null)}
               />
               <Pressable
@@ -340,13 +343,16 @@ const Help = () => {
               </View>
               <Text style={styles.modalLabel}>Share your feedback or report an issue</Text>
               <TextInput
-                style={[styles.modalInput, inputFocused === 'feedback' && styles.modalInputFocused]}
+                style={[
+                  styles.modalInput,
+                  inputFocused === InputFocus.FEEDBACK && styles.modalInputFocused,
+                ]}
                 placeholder="Tell us what you think..."
                 placeholderTextColor={colors.textMuted}
                 multiline
                 value={feedbackText}
                 onChangeText={setFeedbackText}
-                onFocus={() => setInputFocused('feedback')}
+                onFocus={() => setInputFocused(InputFocus.FEEDBACK)}
                 onBlur={() => setInputFocused(null)}
               />
               <Pressable

@@ -16,4 +16,9 @@ export enum Routes {
 }
 
 // Input focus types for modals
-export type InputFocusType = 'help' | 'feedback' | null;
+export enum InputFocus {
+  HELP = 'help',
+  FEEDBACK = 'feedback',
+}
+
+export type InputFocusType = InputFocus | null;
