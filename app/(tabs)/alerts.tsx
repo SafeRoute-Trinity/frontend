@@ -1,11 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
+import GradientBackground from '../../components/ui/GradientBackground';
 import { colors } from '../../constants/theme';
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -34,15 +34,17 @@ const styles = StyleSheet.create({
 });
 
 const Alerts = () => (
-  <View style={styles.container}>
-    <View style={styles.iconContainer}>
-      <Ionicons name="notifications-outline" size={40} color={colors.textSecondary} />
+  <GradientBackground>
+    <View style={styles.container}>
+      <View style={styles.iconContainer}>
+        <Ionicons name="notifications-outline" size={40} color={colors.textSecondary} />
+      </View>
+      <Text style={styles.title}>Alerts</Text>
+      <Text style={styles.subtitle}>
+        Safety alerts and notifications will appear here. This feature is coming soon.
+      </Text>
     </View>
-    <Text style={styles.title}>Alerts</Text>
-    <Text style={styles.subtitle}>
-      Safety alerts and notifications will appear here. This feature is coming soon.
-    </Text>
-  </View>
+  </GradientBackground>
 );
 
 export default Alerts;

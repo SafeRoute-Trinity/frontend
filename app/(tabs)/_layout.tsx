@@ -55,6 +55,18 @@ const TabLayout = () => (
         tabBarIcon: ProfileIcon,
       }}
     />
+    <Tabs.Screen
+      name="personal-info"
+      options={{
+        href: null, // Hide from tab bar
+      }}
+    />
+    <Tabs.Screen
+      name="help"
+      options={{
+        href: null, // Hide from tab bar
+      }}
+    />
   </Tabs>
 );
 

@@ -1,7 +1,12 @@
 export const colors = {
-  // Backgrounds
-  background: '#0F172A',
-  surface: '#1E293B',
+  // Backgrounds - dark/charcoal like the map
+  background: '#0A0A0A',
+  surface: '#1A1A1A',
+
+  // Gradient backgrounds (dark charcoal gradient)
+  gradientStart: '#0F0F0F',
+  gradientMiddle: '#141414',
+  gradientEnd: '#0A0A0A',
 
   // Primary colors
   primary: '#2563EB',

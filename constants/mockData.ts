@@ -24,9 +24,17 @@ export const mockContacts: TrustedContact[] = [
     phone: '+1 555-987-6543',
     avatarUrl: 'https://i.pravatar.cc/150?u=mike',
   },
+  {
+    id: '3',
+    name: 'Emily Rodriguez',
+    role: 'Emergency Contact',
+    relationship: 'Sister',
+    phone: '+1 555-456-7890',
+    avatarUrl: 'https://i.pravatar.cc/150?u=emily',
+  },
 ];
 
 export const STORAGE_KEYS = {
-  SAFE_ROUTING_MODE: 'saferoute_safe_routing_mode',
-  RISK_SENSITIVITY: 'saferoute_risk_sensitivity',
+  VOICE_GUIDANCE: 'saferoute_voice_guidance',
+  UNITS: 'saferoute_units',
 };

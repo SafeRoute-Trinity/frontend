@@ -11,8 +11,8 @@ import {
   View,
 } from 'react-native';
 import ContactCard from '../../components/ui/ContactCard';
-import SliderComponent from '../../components/ui/Slider';
-import Toggle from '../../components/ui/Toggle';
+import GradientBackground from '../../components/ui/GradientBackground';
+import SegmentedToggle from '../../components/ui/SegmentedToggle';
 import { mockContacts, STORAGE_KEYS } from '../../constants/mockData';
 import { colors } from '../../constants/theme';
 import { useAuth0 } from '../../contexts/Auth0Context';
@@ -48,6 +48,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: colors.textPrimary,
+  },
+  headerPlaceholder: {
+    width: 40,
   },
   // User Profile Section
   profileSection: {
@@ -189,26 +192,24 @@ const Profile = () => {
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth0();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Safety Preferences State
-  const [safeRoutingMode, setSafeRoutingMode] = useState(true);
-  const [riskSensitivity, setRiskSensitivity] = useState(75);
+  // Preferences State
+  const [voiceGuidance, setVoiceGuidance] = useState(true);
+  const [useKilometers, setUseKilometers] = useState(true);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   // Load preferences from storage on mount
   useEffect(() => {
     const loadPreferences = async () => {
       try {
-        const storedSafeRouting = await storage.getItem(STORAGE_KEYS.SAFE_ROUTING_MODE);
-        const storedRiskSensitivity = await storage.getItem(STORAGE_KEYS.RISK_SENSITIVITY);
+        const storedVoiceGuidance = await storage.getItem(STORAGE_KEYS.VOICE_GUIDANCE);
+        const storedUnits = await storage.getItem(STORAGE_KEYS.UNITS);
 
-        if (storedSafeRouting !== null) {
-          setSafeRoutingMode(storedSafeRouting === 'true');
+        if (storedVoiceGuidance !== null) {
+          setVoiceGuidance(storedVoiceGuidance === 'true');
         }
-        if (storedRiskSensitivity !== null) {
-          setRiskSensitivity(parseInt(storedRiskSensitivity, 10));
+        if (storedUnits !== null) {
+          setUseKilometers(storedUnits === 'km');
         }
-      } catch (error) {
-        console.error('Failed to load preferences:', error);
       } finally {
         setPreferencesLoaded(true);
       }
@@ -217,23 +218,16 @@ const Profile = () => {
     loadPreferences();
   }, []);
 
-  // Save safe routing mode when changed
-  const handleSafeRoutingChange = async (value: boolean) => {
-    setSafeRoutingMode(value);
-    try {
-      await storage.setItem(STORAGE_KEYS.SAFE_ROUTING_MODE, value.toString());
-    } catch (error) {
-      console.error('Failed to save safe routing mode:', error);
-    }
+  // Save voice guidance when changed
+  const handleVoiceGuidanceChange = async (value: boolean) => {
+    setVoiceGuidance(value);
+    await storage.setItem(STORAGE_KEYS.VOICE_GUIDANCE, value.toString());
   };
 
-  // Save risk sensitivity when sliding completes
-  const handleRiskSensitivityComplete = async (value: number) => {
-    try {
-      await storage.setItem(STORAGE_KEYS.RISK_SENSITIVITY, Math.round(value).toString());
-    } catch (error) {
-      console.error('Failed to save risk sensitivity:', error);
-    }
+  // Save units when changed
+  const handleUnitsChange = async (useKm: boolean) => {
+    setUseKilometers(useKm);
+    await storage.setItem(STORAGE_KEYS.UNITS, useKm ? 'km' : 'mi');
   };
 
   const handleLogout = async () => {
@@ -277,7 +271,7 @@ const Profile = () => {
   }
 
   return (
-    <View style={styles.container}>
+    <GradientBackground>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         {/* Header */}
         <View style={styles.header}>
@@ -288,14 +282,7 @@ const Profile = () => {
             <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
           </Pressable>
           <Text style={styles.headerTitle}>Profile</Text>
-          <Pressable
-            style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
-            onPress={() => {
-              // TODO: Open settings modal
-            }}
-          >
-            <Ionicons name="settings-outline" size={24} color={colors.textPrimary} />
-          </Pressable>
+          <View style={styles.headerPlaceholder} />
         </View>
 
         {/* User Profile Section */}
@@ -323,36 +310,24 @@ const Profile = () => {
           <Text style={styles.memberSince}>{getMemberSinceDate()}</Text>
         </View>
 
-        {/* Safety Preferences Section */}
+        {/* Preferences Section */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Safety Preferences</Text>
-            <Pressable
-              onPress={() => {
-                /* TODO: Navigate to edit weights */
-              }}
-            >
-              <Text style={styles.sectionAction}>Edit Weights</Text>
-            </Pressable>
+            <Text style={styles.sectionTitle}>Preferences</Text>
           </View>
           <View style={styles.card}>
-            <Toggle
-              value={safeRoutingMode}
-              onValueChange={handleSafeRoutingChange}
-              label="Safe Routing Mode"
-              subtitle="Prioritize lit & populated paths"
-              icon={<Ionicons name="shield-checkmark" size={20} color={colors.accent} />}
+            <SegmentedToggle
+              label="Voice Guidance"
+              options={['No', 'Yes']}
+              selectedIndex={voiceGuidance ? 1 : 0}
+              onSelect={(index) => handleVoiceGuidanceChange(index === 1)}
             />
             <View style={styles.cardDivider} />
-            <SliderComponent
-              value={riskSensitivity}
-              onValueChange={setRiskSensitivity}
-              onSlidingComplete={handleRiskSensitivityComplete}
-              label="Risk Sensitivity"
-              min={0}
-              max={100}
-              step={1}
-              showPercentage
+            <SegmentedToggle
+              label="Distance Units"
+              options={['Mile', 'km']}
+              selectedIndex={useKilometers ? 1 : 0}
+              onSelect={(index) => handleUnitsChange(index === 1)}
             />
           </View>
         </View>
@@ -391,15 +366,28 @@ const Profile = () => {
           <View style={styles.card}>
             <Pressable
               style={({ pressed }) => [styles.settingsRow, pressed && styles.settingsRowPressed]}
-              onPress={() => {
-                /* TODO: Navigate to personal info */
-              }}
+              onPress={() => router.push('/(tabs)/personal-info')}
             >
               <View style={styles.settingsRowLeft}>
                 <View style={styles.settingsIcon}>
                   <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
                 </View>
                 <Text style={styles.settingsText}>Personal Information</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+            </Pressable>
+
+            <View style={styles.cardDivider} />
+
+            <Pressable
+              style={({ pressed }) => [styles.settingsRow, pressed && styles.settingsRowPressed]}
+              onPress={() => router.push('/(tabs)/help')}
+            >
+              <View style={styles.settingsRowLeft}>
+                <View style={styles.settingsIcon}>
+                  <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                </View>
+                <Text style={styles.settingsText}>Help</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
             </Pressable>
@@ -424,7 +412,7 @@ const Profile = () => {
           </View>
         </View>
       </ScrollView>
-    </View>
+    </GradientBackground>
   );
 };
 
