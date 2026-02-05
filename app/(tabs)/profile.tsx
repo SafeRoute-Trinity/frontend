@@ -207,8 +207,6 @@ const Profile = () => {
         if (storedUnits !== null) {
           setUnitsIndex(storedUnits === 'km' ? 0 : 1);
         }
-      } catch (error) {
-        console.error('Failed to load preferences:', error);
       } finally {
         setPreferencesLoaded(true);
       }
@@ -220,43 +218,28 @@ const Profile = () => {
   // Save voice guidance preference when changed
   const handleVoiceGuidanceChange = async (index: number) => {
     setVoiceGuidanceIndex(index);
-    try {
-      await storage.setItem(STORAGE_KEYS.VOICE_GUIDANCE, index === 0 ? 'yes' : 'no');
-    } catch (error) {
-      console.error('Failed to save voice guidance:', error);
-    }
+    await storage.setItem(STORAGE_KEYS.VOICE_GUIDANCE, index === 0 ? 'yes' : 'no');
   };
 
   // Save units preference when changed
   const handleUnitsChange = async (index: number) => {
     setUnitsIndex(index);
-    try {
-      await storage.setItem(STORAGE_KEYS.UNITS, index === 0 ? 'km' : 'mile');
-    } catch (error) {
-      console.error('Failed to save units:', error);
-    }
+    await storage.setItem(STORAGE_KEYS.UNITS, index === 0 ? 'km' : 'mile');
   };
 
   const handleLogout = async () => {
-    try {
-      setIsLoggingOut(true);
-      await logout();
-      router.replace(Routes.LOGIN);
-    } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      setIsLoggingOut(false);
-    }
+    setIsLoggingOut(true);
+    await logout();
+    router.replace(Routes.LOGIN);
+    setIsLoggingOut(false);
   };
 
-  const handleCallContact = (contactId: string) => {
+  const handleCallContact = (_contactId: string) => {
     // TODO: Implement calling functionality
-    console.log('Calling contact:', contactId);
   };
 
-  const handleMoreContact = (contactId: string) => {
+  const handleMoreContact = (_contactId: string) => {
     // TODO: Implement more options menu
-    console.log('More options for contact:', contactId);
   };
 
   // Format member since date
@@ -282,7 +265,10 @@ const Profile = () => {
   return (
     <GradientBackground>
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
             <Pressable

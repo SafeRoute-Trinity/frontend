@@ -187,7 +187,12 @@ const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
       <Text style={styles.menuItemTitle}>{title}</Text>
       {subtitle && <Text style={styles.menuItemSubtitle}>{subtitle}</Text>}
     </View>
-    <Ionicons name="chevron-forward" size={20} color={colors.textMuted} style={styles.menuItemArrow} />
+    <Ionicons
+      name="chevron-forward"
+      size={20}
+      color={colors.textMuted}
+      style={styles.menuItemArrow}
+    />
   </Pressable>
 );
 
@@ -205,13 +210,11 @@ const Help = () => {
 
   const handleAppInfo = () => {
     // TODO: Show app info modal
-    console.log('App info pressed');
   };
 
   const handleSubmitHelp = () => {
     if (helpQuery.trim()) {
       // TODO: Submit help query to backend
-      console.log('Help query submitted:', helpQuery);
       setHelpQuery('');
       setShowHelpModal(false);
     }
@@ -220,7 +223,6 @@ const Help = () => {
   const handleSubmitFeedback = () => {
     if (feedbackText.trim()) {
       // TODO: Submit feedback to backend
-      console.log('Feedback submitted:', feedbackText);
       setFeedbackText('');
       setShowFeedbackModal(false);
     }
@@ -229,7 +231,10 @@ const Help = () => {
   return (
     <GradientBackground>
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
             <Pressable
@@ -302,7 +307,10 @@ const Help = () => {
                 onBlur={() => setInputFocused(null)}
               />
               <Pressable
-                style={[styles.modalSubmitButton, !helpQuery.trim() && styles.modalSubmitButtonDisabled]}
+                style={[
+                  styles.modalSubmitButton,
+                  !helpQuery.trim() && styles.modalSubmitButtonDisabled,
+                ]}
                 onPress={handleSubmitHelp}
                 disabled={!helpQuery.trim()}
               >
@@ -323,7 +331,10 @@ const Help = () => {
             <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Send Feedback</Text>
-                <Pressable style={styles.modalCloseButton} onPress={() => setShowFeedbackModal(false)}>
+                <Pressable
+                  style={styles.modalCloseButton}
+                  onPress={() => setShowFeedbackModal(false)}
+                >
                   <Ionicons name="close" size={20} color={colors.textPrimary} />
                 </Pressable>
               </View>
@@ -339,7 +350,10 @@ const Help = () => {
                 onBlur={() => setInputFocused(null)}
               />
               <Pressable
-                style={[styles.modalSubmitButton, !feedbackText.trim() && styles.modalSubmitButtonDisabled]}
+                style={[
+                  styles.modalSubmitButton,
+                  !feedbackText.trim() && styles.modalSubmitButtonDisabled,
+                ]}
                 onPress={handleSubmitFeedback}
                 disabled={!feedbackText.trim()}
               >

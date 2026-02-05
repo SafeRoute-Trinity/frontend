@@ -210,7 +210,6 @@ const PersonalInfo = () => {
       setTimeout(resolve, 1000);
     });
     // TODO: Implement actual save logic
-    console.log('Saving changes:', { name, phone });
     setIsSaving(false);
   };
 
@@ -232,7 +231,10 @@ const PersonalInfo = () => {
   return (
     <GradientBackground>
       <View style={styles.container}>
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
           {/* Header */}
           <View style={styles.header}>
             <Pressable
