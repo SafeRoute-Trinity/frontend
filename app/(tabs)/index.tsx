@@ -13,8 +13,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useAuth0 } from '../../contexts/Auth0Context';
 import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
+import { useAuth0 } from '../../contexts/Auth0Context';
 
 /* eslint-disable no-console */
 
@@ -24,6 +24,11 @@ if (MAPBOX_ACCESS_TOKEN) {
   // Use initializeMapbox() with the already-imported Mapbox instance
   initializeMapbox(Mapbox);
 }
+
+// Feedback submit endpoint - configurable via EXPO_PUBLIC_FEEDBACK_SUBMIT_URL
+const FEEDBACK_SUBMIT_URL =
+  process.env.EXPO_PUBLIC_FEEDBACK_SUBMIT_URL ||
+  'https://saferoutemap.duckdns.org/v1/feedback/submit';
 
 interface LocationData {
   latitude: number;
@@ -490,8 +495,8 @@ const Index = () => {
   const [reportText, setReportText] = useState('');
   const [reportLocation, setReportLocation] = useState<LocationData | null>(null);
   const [feedbackType, setFeedbackType] = useState<
-    
-  >('saf>(null);
+    'safety_issue' | 'route_quality' | 'other' | null
+  >(null);
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
   const { user } = useAuth0();
@@ -519,42 +524,6 @@ const Index = () => {
       console.warn('Failed to read long press coordinates', err);
     }
   };
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setIsLoadingLocation(true);
-        setLocationError(null);
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocationError('Location permission denied');
-          setIsLoadingLocation(false);
-          return;
-        }
-
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        const { latitude, longitude } = currentLocation.coords;
-
-        // Detect simulator default location (San Francisco area) and use Dublin instead
-        const isSanFranciscoDefault =
-          Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
-
-        const newLocation = isSanFranciscoDefault ? DEFAULT_LOCATION : { latitude, longitude };
-
-        setLocation(newLocation);
-        setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
-      } catch (error) {
-        console.error('Error getting location:', error);
-        setLocationError('Failed to get location');
-      } finally {
-        setIsLoadingLocation(false);
-      }
-    })();
-  }, []);
 
   const handleZoomIn = () => {
     const newZoom = Math.min(zoomLevel + ZOOM_STEP, MAX_ZOOM);
@@ -605,6 +574,42 @@ const Index = () => {
       }
     }, 100);
   };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setIsLoadingLocation(true);
+        setLocationError(null);
+
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationError('Location permission denied');
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        const { latitude, longitude } = currentLocation.coords;
+
+        // Detect simulator default location (San Francisco area) and use Dublin instead
+        const isSanFranciscoDefault =
+          Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
+
+        const newLocation = isSanFranciscoDefault ? DEFAULT_LOCATION : { latitude, longitude };
+
+        setLocation(newLocation);
+        setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
+      } catch (error) {
+        console.error('Error getting location:', error);
+        setLocationError('Failed to get location');
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    })();
+  }, []);
 
   const searchPlaces = async (query: string) => {
     if (!query.trim() || !MAPBOX_ACCESS_TOKEN) {
@@ -1041,6 +1046,8 @@ const Index = () => {
                 : 'Location unknown'}
             </Text>
             {/* Feedback type selector */}
+
+            {/* Severity selector */}
             <Text style={[styles.modalLabel, { marginTop: 8 }]}>Feedback Type</Text>
             <View style={{ flexDirection: 'row', marginBottom: 8 }}>
               <Pressable
@@ -1054,8 +1061,6 @@ const Index = () => {
                 <Text
                   style={
                     feedbackType === 'safety_issue'
-                     
-                     
                       ? styles.pillButtonTextSelected
                       : styles.pillButtonText
                   }
@@ -1072,8 +1077,6 @@ const Index = () => {
                 onPress={() => setFeedbackType('route_quality')}
               >
                 <Text
-                     
-                     
                   style={
                     feedbackType === 'route_quality'
                       ? styles.pillButtonTextSelected
@@ -1087,11 +1090,7 @@ const Index = () => {
                 style={
                   feedbackType === 'other'
                     ? [styles.pillButton, styles.pillButtonSelected]
-                    :
-                  styles.
-                    pillButton
-                  
-                
+                    : styles.pillButton
                 }
                 onPress={() => setFeedbackType('other')}
               >
@@ -1107,16 +1106,12 @@ const Index = () => {
 
             {/* Severity 
                           selector */}
-                         
-                         ,
-                        
+
             <Text style={styles.modalLabel}>Severity</Text>
             <View style={{ flexDirection: 'row', marginBottom: 8 }}>
               {(['low', 'medium', 'high', 'critical'] as const).map((s, idx) => (
                 <Pressable
-                  key={
-                   s}
-                  
+                  key={s}
                   style={
                     severity === s
                       ? [
@@ -1140,7 +1135,6 @@ const Index = () => {
             <Text style={[styles.modalLabel, { marginTop: 4 }]}>Description</Text>
             <TextInput
               style={styles.modalInput}
-                       
               placeholder="Describe the issue..."
               placeholderTextColor="#9CA3AF"
               multiline
@@ -1178,7 +1172,7 @@ const Index = () => {
                 };
 
                 try {
-                  const resp = await fetch('http://127.0.0.1:20004/v1/feedback/submit', {
+                  const resp = await fetch(FEEDBACK_SUBMIT_URL, {
                     method: 'POST',
                     headers: {
                       accept: 'application/json',
@@ -1191,12 +1185,8 @@ const Index = () => {
                     const text = await resp.text().catch(() => resp.statusText);
                     throw new Error(`HTTP ${resp.status}: ${text}`);
                   }
-                
-              
 
-                  Alert.alert('Report submitted', '
-                Thank you for your feedback.');
-              
+                  Alert.alert('Report submitted', 'Thank you for your feedback.');
                 } catch (err: any) {
                   console.warn('Failed to submit report', err);
                   Alert.alert('Submission failed', err?.message || 'Failed to submit report');
