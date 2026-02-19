@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +13,8 @@ import {
   View,
 } from 'react-native';
 import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
+
+/* eslint-disable no-console */
 
 // Initialize Mapbox with access token
 const MAPBOX_ACCESS_TOKEN = mapboxConfig.accessToken;
@@ -361,6 +364,73 @@ const styles = StyleSheet.create({
   buttonPressed: {
     opacity: 0.85,
   },
+  // Modal styles (used for map long-press report)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0B1220',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalLabel: {
+    fontSize: 14,
+    color: '#CBD5F5',
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: '#0B1220',
+    borderRadius: 12,
+    padding: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  modalSubmitButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  modalSubmitButtonDisabled: {
+    backgroundColor: '#374151',
+  },
+  modalSubmitText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
 });
 
 // Default location: Dublin, Ireland
@@ -390,11 +460,30 @@ const Index = () => {
   const [routeEnd, setRouteEnd] = useState<[number, number] | null>(null);
   const cameraRef = useRef<Camera>(null);
   const [centerCoordinate, setCenterCoordinate] = useState<[number, number] | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportText, setReportText] = useState('');
+  const [reportLocation, setReportLocation] = useState<LocationData | null>(null);
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
   const ZOOM_STEP = 1;
   const LONG_PRESS_DURATION = 5000; // 5 seconds
+
+  // Handle long press on the map to report a location
+  const handleMapLongPress = (e: any) => {
+    try {
+      // Mapbox onPress/longPress events include geometry.coordinates = [lng, lat]
+      const coords = e?.geometry?.coordinates || e?.properties?.coordinate || null;
+      if (coords && Array.isArray(coords) && coords.length >= 2) {
+        const [longitude, latitude] = coords;
+        setReportLocation({ latitude, longitude });
+        setReportText('');
+        setShowReportModal(true);
+      }
+    } catch (err) {
+      console.warn('Failed to read long press coordinates', err);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -680,6 +769,7 @@ const Index = () => {
           styleURL={Mapbox.StyleURL.Dark}
           logoEnabled={false}
           attributionEnabled={false}
+          LongPress={handleMapLongPress}
           zoomEnabled
           scrollEnabled
           pitchEnabled
@@ -743,6 +833,18 @@ const Index = () => {
             <PointAnnotation id="route-end" coordinate={routeEnd} title="Route End">
               <View style={styles.markerContainer}>
                 <View style={styles.endMarker} />
+              </View>
+            </PointAnnotation>
+          )}
+          {/* Report marker placed when user long-presses the map */}
+          {reportLocation && (
+            <PointAnnotation
+              id="reported-location"
+              coordinate={[reportLocation.longitude, reportLocation.latitude]}
+              title="Reported Location"
+            >
+              <View style={styles.markerContainer}>
+                <View style={[styles.selectedMarker, { backgroundColor: '#EF4444' }]} />
               </View>
             </PointAnnotation>
           )}
@@ -882,6 +984,65 @@ const Index = () => {
           </Pressable>
         </View>
       )}
+
+      {/* Report Modal (map long-press) */}
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowReportModal(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Report unsafe location</Text>
+              <Pressable <Text style={{ fontSize: 16 }}> Pressable>View>
+            <Text style={styles.modalLabel}>
+              {reportLocation
+                ? `Location: ${reportLocation.latitude.toFixed(6)}, ${reportLocation.longitude.toFixed(
+                    6
+                  )}`
+                : 'Location unknown'}
+            </Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Describe why this location is unsafe (optional)"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={reportText}
+              onChangeText={setReportText}
+            />
+            <Pressable
+              style={[
+                styles.modalSubmitButton,
+                reportText.trim() === '' && styles.modalSubmitButtonDisabled,
+              ]}
+              onPress={async () => {
+                // TODO: replace with real API call
+                const payload = {
+                  latitude: reportLocation?.latitude,
+                  longitude: reportLocation?.longitude,
+                  text: reportText.trim() || undefined,
+                  timestamp: new Date().toISOString(),
+                };
+                try {
+                  console.log('Submitting report', payload);
+                  // example: await fetch('/api/reports', { method: 'POST', body: JSON.stringify(payload) });
+                } catch (err) {
+                  console.warn('Failed to submit report', err);
+                } finally {
+                  setShowReportModal(false);
+                  setReportLocation(null);
+                  setReportText('');
+                }
+              }}
+              disabled={reportText.trim() === ''}
+            >
+              <Text style={styles.modalSubmitText}>Submit</Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
