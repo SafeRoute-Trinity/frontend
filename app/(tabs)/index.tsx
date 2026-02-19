@@ -4,7 +4,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Modal,
   Pressable,
   StyleSheet,
   Text,
@@ -12,6 +14,9 @@ import {
   View,
 } from 'react-native';
 import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
+import { useAuth0 } from '../../contexts/Auth0Context';
+
+/* eslint-disable no-console */
 
 // Initialize Mapbox with access token
 const MAPBOX_ACCESS_TOKEN = mapboxConfig.accessToken;
@@ -19,6 +24,11 @@ if (MAPBOX_ACCESS_TOKEN) {
   // Use initializeMapbox() with the already-imported Mapbox instance
   initializeMapbox(Mapbox);
 }
+
+// Feedback submit endpoint - configurable via EXPO_PUBLIC_FEEDBACK_SUBMIT_URL
+const FEEDBACK_SUBMIT_URL =
+  process.env.EXPO_PUBLIC_FEEDBACK_SUBMIT_URL ||
+  'https://saferoutemap.duckdns.org/v1/feedback/submit';
 
 interface LocationData {
   latitude: number;
@@ -361,7 +371,104 @@ const styles = StyleSheet.create({
   buttonPressed: {
     opacity: 0.85,
   },
+  // Modal styles (used for map long-press report)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0B1220',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalLabel: {
+    fontSize: 14,
+    color: '#CBD5F5',
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: '#0B1220',
+    borderRadius: 12,
+    padding: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    minHeight: 100,
+    textAlignVertical: 'top',
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  modalSubmitButton: {
+    backgroundColor: '#EF4444',
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  modalSubmitButtonDisabled: {
+    backgroundColor: '#374151',
+  },
+  modalSubmitText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  pillButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#0B1220',
+    borderWidth: 1,
+    borderColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillButtonSelected: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  pillButtonText: {
+    color: '#CBD5F5',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pillButtonTextSelected: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
+
+// Default location: Dublin, Ireland
+const DEFAULT_LOCATION = {
+  latitude: 53.3498,
+  longitude: -6.2603,
+};
 
 const Index = () => {
   const router = useRouter();
@@ -384,43 +491,39 @@ const Index = () => {
   const [routeEnd, setRouteEnd] = useState<[number, number] | null>(null);
   const cameraRef = useRef<Camera>(null);
   const [centerCoordinate, setCenterCoordinate] = useState<[number, number] | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportText, setReportText] = useState('');
+  const [reportLocation, setReportLocation] = useState<LocationData | null>(null);
+  const [feedbackType, setFeedbackType] = useState<
+    'safety_issue' | 'route_quality' | 'other' | null
+  >(null);
+  const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const { user } = useAuth0();
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
   const ZOOM_STEP = 1;
   const LONG_PRESS_DURATION = 5000; // 5 seconds
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setIsLoadingLocation(true);
-        setLocationError(null);
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocationError('Location permission denied');
-          setIsLoadingLocation(false);
-          return;
-        }
-
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        const newLocation = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        };
-        setLocation(newLocation);
-        setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
-      } catch (error) {
-        console.error('Error getting location:', error);
-        setLocationError('Failed to get location');
-      } finally {
-        setIsLoadingLocation(false);
+  // Handle long press on the map to report a location
+  const handleMapLongPress = (e: any) => {
+    try {
+      // Mapbox onPress/longPress events include geometry.coordinates = [lng, lat]
+      const coords = e?.geometry?.coordinates || e?.properties?.coordinate || null;
+      if (coords && Array.isArray(coords) && coords.length >= 2) {
+        const [longitude, latitude] = coords;
+        setReportLocation({ latitude, longitude });
+        setReportText('');
+        setFeedbackType(null);
+        setSeverity(null);
+        setIsSubmittingReport(false);
+        setShowReportModal(true);
       }
-    })();
-  }, []);
+    } catch (err) {
+      console.warn('Failed to read long press coordinates', err);
+    }
+  };
 
   const handleZoomIn = () => {
     const newZoom = Math.min(zoomLevel + ZOOM_STEP, MAX_ZOOM);
@@ -471,6 +574,42 @@ const Index = () => {
       }
     }, 100);
   };
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setIsLoadingLocation(true);
+        setLocationError(null);
+
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setLocationError('Location permission denied');
+          setIsLoadingLocation(false);
+          return;
+        }
+
+        const currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+
+        const { latitude, longitude } = currentLocation.coords;
+
+        // Detect simulator default location (San Francisco area) and use Dublin instead
+        const isSanFranciscoDefault =
+          Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
+
+        const newLocation = isSanFranciscoDefault ? DEFAULT_LOCATION : { latitude, longitude };
+
+        setLocation(newLocation);
+        setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
+      } catch (error) {
+        console.error('Error getting location:', error);
+        setLocationError('Failed to get location');
+      } finally {
+        setIsLoadingLocation(false);
+      }
+    })();
+  }, []);
 
   const searchPlaces = async (query: string) => {
     if (!query.trim() || !MAPBOX_ACCESS_TOKEN) {
@@ -670,6 +809,7 @@ const Index = () => {
           styleURL={Mapbox.StyleURL.Dark}
           logoEnabled={false}
           attributionEnabled={false}
+          onLongPress={handleMapLongPress}
           zoomEnabled
           scrollEnabled
           pitchEnabled
@@ -733,6 +873,18 @@ const Index = () => {
             <PointAnnotation id="route-end" coordinate={routeEnd} title="Route End">
               <View style={styles.markerContainer}>
                 <View style={styles.endMarker} />
+              </View>
+            </PointAnnotation>
+          )}
+          {/* Report marker placed when user long-presses the map */}
+          {reportLocation && (
+            <PointAnnotation
+              id="reported-location"
+              coordinate={[reportLocation.longitude, reportLocation.latitude]}
+              title="Reported Location"
+            >
+              <View style={styles.markerContainer}>
+                <View style={[styles.selectedMarker, { backgroundColor: '#EF4444' }]} />
               </View>
             </PointAnnotation>
           )}
@@ -872,6 +1024,192 @@ const Index = () => {
           </Pressable>
         </View>
       )}
+
+      {/* Report Modal (map long-press) */}
+      <Modal
+        visible={showReportModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowReportModal(false)}
+      >
+        <Pressable style={styles.modalOverlay} onPress={() => setShowReportModal(false)}>
+          <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Report unsafe location</Text>
+              <Pressable style={styles.modalCloseButton} onPress={() => setShowReportModal(false)}>
+                <Text style={{ fontSize: 16 }}>✕</Text>
+              </Pressable>
+            </View>
+            <Text style={styles.modalLabel}>
+              {reportLocation
+                ? `Location: ${reportLocation.latitude.toFixed(6)}, ${reportLocation.longitude.toFixed(6)}`
+                : 'Location unknown'}
+            </Text>
+            {/* Feedback type selector */}
+
+            {/* Severity selector */}
+            <Text style={[styles.modalLabel, { marginTop: 8 }]}>Feedback Type</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Pressable
+                style={
+                  feedbackType === 'safety_issue'
+                    ? [styles.pillButton, styles.pillButtonSelected, { marginRight: 8 }]
+                    : [styles.pillButton, { marginRight: 8 }]
+                }
+                onPress={() => setFeedbackType('safety_issue')}
+              >
+                <Text
+                  style={
+                    feedbackType === 'safety_issue'
+                      ? styles.pillButtonTextSelected
+                      : styles.pillButtonText
+                  }
+                >
+                  Safety Issue
+                </Text>
+              </Pressable>
+              <Pressable
+                style={
+                  feedbackType === 'route_quality'
+                    ? [styles.pillButton, styles.pillButtonSelected, { marginRight: 8 }]
+                    : [styles.pillButton, { marginRight: 8 }]
+                }
+                onPress={() => setFeedbackType('route_quality')}
+              >
+                <Text
+                  style={
+                    feedbackType === 'route_quality'
+                      ? styles.pillButtonTextSelected
+                      : styles.pillButtonText
+                  }
+                >
+                  Route Quality
+                </Text>
+              </Pressable>
+              <Pressable
+                style={
+                  feedbackType === 'other'
+                    ? [styles.pillButton, styles.pillButtonSelected]
+                    : styles.pillButton
+                }
+                onPress={() => setFeedbackType('other')}
+              >
+                <Text
+                  style={
+                    feedbackType === 'other' ? styles.pillButtonTextSelected : styles.pillButtonText
+                  }
+                >
+                  Other
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Severity 
+                          selector */}
+
+            <Text style={styles.modalLabel}>Severity</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              {(['low', 'medium', 'high', 'critical'] as const).map((s, idx) => (
+                <Pressable
+                  key={s}
+                  style={
+                    severity === s
+                      ? [
+                          styles.pillButton,
+                          styles.pillButtonSelected,
+                          idx < 3 ? { marginRight: 8 } : {},
+                        ]
+                      : [styles.pillButton, idx < 3 ? { marginRight: 8 } : {}]
+                  }
+                  onPress={() => setSeverity(s)}
+                >
+                  <Text
+                    style={severity === s ? styles.pillButtonTextSelected : styles.pillButtonText}
+                  >
+                    {s[0].toUpperCase() + s.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.modalLabel, { marginTop: 4 }]}>Description</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Describe the issue..."
+              placeholderTextColor="#9CA3AF"
+              multiline
+              value={reportText}
+              onChangeText={setReportText}
+            />
+
+            <Pressable
+              style={
+                isSubmittingReport
+                  ? [styles.modalSubmitButton, styles.modalSubmitButtonDisabled]
+                  : [
+                      styles.modalSubmitButton,
+                      (!feedbackType || !severity || reportText.trim() === '') &&
+                        styles.modalSubmitButtonDisabled,
+                    ]
+              }
+              onPress={async () => {
+                if (!reportLocation) return;
+                if (!feedbackType || !severity || reportText.trim() === '') {
+                  return;
+                }
+                setIsSubmittingReport(true);
+                const payload: any = {
+                  user_id: user?.sub || 'anonymous',
+                  route_id: '',
+                  type: feedbackType,
+                  severity,
+                  location: {
+                    latitude: reportLocation.latitude,
+                    longitude: reportLocation.longitude,
+                  },
+                  description: reportText.trim(),
+                  attachments: [],
+                };
+
+                try {
+                  const resp = await fetch(FEEDBACK_SUBMIT_URL, {
+                    method: 'POST',
+                    headers: {
+                      accept: 'application/json',
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                  });
+
+                  if (!resp.ok) {
+                    const text = await resp.text().catch(() => resp.statusText);
+                    throw new Error(`HTTP ${resp.status}: ${text}`);
+                  }
+
+                  Alert.alert('Report submitted', 'Thank you for your feedback.');
+                } catch (err: any) {
+                  console.warn('Failed to submit report', err);
+                  Alert.alert('Submission failed', err?.message || 'Failed to submit report');
+                } finally {
+                  setIsSubmittingReport(false);
+                  setShowReportModal(false);
+                  setReportLocation(null);
+                  setReportText('');
+                  setFeedbackType(null);
+                  setSeverity(null);
+                }
+              }}
+              disabled={
+                isSubmittingReport || !feedbackType || !severity || reportText.trim() === ''
+              }
+            >
+              <Text style={styles.modalSubmitText}>
+                {isSubmittingReport ? 'Submitting...' : 'Submit Report'}
+              </Text>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 };
