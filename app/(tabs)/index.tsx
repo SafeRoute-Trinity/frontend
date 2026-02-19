@@ -363,6 +363,12 @@ const styles = StyleSheet.create({
   },
 });
 
+// Default location: Dublin, Ireland
+const DEFAULT_LOCATION = {
+  latitude: 53.3498,
+  longitude: -6.2603,
+};
+
 const Index = () => {
   const router = useRouter();
   const [location, setLocation] = useState<LocationData | null>(null);
@@ -407,10 +413,14 @@ const Index = () => {
           accuracy: Location.Accuracy.High,
         });
 
-        const newLocation = {
-          latitude: currentLocation.coords.latitude,
-          longitude: currentLocation.coords.longitude,
-        };
+        const { latitude, longitude } = currentLocation.coords;
+
+        // Detect simulator default location (San Francisco area) and use Dublin instead
+        const isSanFranciscoDefault =
+          Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
+
+        const newLocation = isSanFranciscoDefault ? DEFAULT_LOCATION : { latitude, longitude };
+
         setLocation(newLocation);
         setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
       } catch (error) {
