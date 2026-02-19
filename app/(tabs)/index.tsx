@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Modal,
   Pressable,
@@ -12,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useAuth0 } from '../../contexts/Auth0Context';
 import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
 
 /* eslint-disable no-console */
@@ -431,6 +433,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
+  pillButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#0B1220',
+    borderWidth: 1,
+    borderColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  pillButtonSelected: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  pillButtonText: {
+    color: '#CBD5F5',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pillButtonTextSelected: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
 });
 
 // Default location: Dublin, Ireland
@@ -463,6 +489,12 @@ const Index = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportText, setReportText] = useState('');
   const [reportLocation, setReportLocation] = useState<LocationData | null>(null);
+  const [feedbackType, setFeedbackType] = useState<
+    
+  >('saf>(null);
+  const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null);
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const { user } = useAuth0();
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
@@ -478,6 +510,9 @@ const Index = () => {
         const [longitude, latitude] = coords;
         setReportLocation({ latitude, longitude });
         setReportText('');
+        setFeedbackType(null);
+        setSeverity(null);
+        setIsSubmittingReport(false);
         setShowReportModal(true);
       }
     } catch (err) {
@@ -769,7 +804,7 @@ const Index = () => {
           styleURL={Mapbox.StyleURL.Dark}
           logoEnabled={false}
           attributionEnabled={false}
-          LongPress={handleMapLongPress}
+          onLongPress={handleMapLongPress}
           zoomEnabled
           scrollEnabled
           pitchEnabled
@@ -996,49 +1031,191 @@ const Index = () => {
           <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Report unsafe location</Text>
-              <Pressable <Text style={{ fontSize: 16 }}> Pressable>View>
+              <Pressable style={styles.modalCloseButton} onPress={() => setShowReportModal(false)}>
+                <Text style={{ fontSize: 16 }}>✕</Text>
+              </Pressable>
+            </View>
             <Text style={styles.modalLabel}>
               {reportLocation
-                ? `Location: ${reportLocation.latitude.toFixed(6)}, ${reportLocation.longitude.toFixed(
-                    6
-                  )}`
+                ? `Location: ${reportLocation.latitude.toFixed(6)}, ${reportLocation.longitude.toFixed(6)}`
                 : 'Location unknown'}
             </Text>
+            {/* Feedback type selector */}
+            <Text style={[styles.modalLabel, { marginTop: 8 }]}>Feedback Type</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              <Pressable
+                style={
+                  feedbackType === 'safety_issue'
+                    ? [styles.pillButton, styles.pillButtonSelected, { marginRight: 8 }]
+                    : [styles.pillButton, { marginRight: 8 }]
+                }
+                onPress={() => setFeedbackType('safety_issue')}
+              >
+                <Text
+                  style={
+                    feedbackType === 'safety_issue'
+                     
+                     
+                      ? styles.pillButtonTextSelected
+                      : styles.pillButtonText
+                  }
+                >
+                  Safety Issue
+                </Text>
+              </Pressable>
+              <Pressable
+                style={
+                  feedbackType === 'route_quality'
+                    ? [styles.pillButton, styles.pillButtonSelected, { marginRight: 8 }]
+                    : [styles.pillButton, { marginRight: 8 }]
+                }
+                onPress={() => setFeedbackType('route_quality')}
+              >
+                <Text
+                     
+                     
+                  style={
+                    feedbackType === 'route_quality'
+                      ? styles.pillButtonTextSelected
+                      : styles.pillButtonText
+                  }
+                >
+                  Route Quality
+                </Text>
+              </Pressable>
+              <Pressable
+                style={
+                  feedbackType === 'other'
+                    ? [styles.pillButton, styles.pillButtonSelected]
+                    :
+                  styles.
+                    pillButton
+                  
+                
+                }
+                onPress={() => setFeedbackType('other')}
+              >
+                <Text
+                  style={
+                    feedbackType === 'other' ? styles.pillButtonTextSelected : styles.pillButtonText
+                  }
+                >
+                  Other
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Severity 
+                          selector */}
+                         
+                         ,
+                        
+            <Text style={styles.modalLabel}>Severity</Text>
+            <View style={{ flexDirection: 'row', marginBottom: 8 }}>
+              {(['low', 'medium', 'high', 'critical'] as const).map((s, idx) => (
+                <Pressable
+                  key={
+                   s}
+                  
+                  style={
+                    severity === s
+                      ? [
+                          styles.pillButton,
+                          styles.pillButtonSelected,
+                          idx < 3 ? { marginRight: 8 } : {},
+                        ]
+                      : [styles.pillButton, idx < 3 ? { marginRight: 8 } : {}]
+                  }
+                  onPress={() => setSeverity(s)}
+                >
+                  <Text
+                    style={severity === s ? styles.pillButtonTextSelected : styles.pillButtonText}
+                  >
+                    {s[0].toUpperCase() + s.slice(1)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={[styles.modalLabel, { marginTop: 4 }]}>Description</Text>
             <TextInput
               style={styles.modalInput}
-              placeholder="Describe why this location is unsafe (optional)"
+                       
+              placeholder="Describe the issue..."
               placeholderTextColor="#9CA3AF"
               multiline
               value={reportText}
               onChangeText={setReportText}
             />
+
             <Pressable
-              style={[
-                styles.modalSubmitButton,
-                reportText.trim() === '' && styles.modalSubmitButtonDisabled,
-              ]}
+              style={
+                isSubmittingReport
+                  ? [styles.modalSubmitButton, styles.modalSubmitButtonDisabled]
+                  : [
+                      styles.modalSubmitButton,
+                      (!feedbackType || !severity || reportText.trim() === '') &&
+                        styles.modalSubmitButtonDisabled,
+                    ]
+              }
               onPress={async () => {
-                // TODO: replace with real API call
-                const payload = {
-                  latitude: reportLocation?.latitude,
-                  longitude: reportLocation?.longitude,
-                  text: reportText.trim() || undefined,
-                  timestamp: new Date().toISOString(),
+                if (!reportLocation) return;
+                if (!feedbackType || !severity || reportText.trim() === '') {
+                  return;
+                }
+                setIsSubmittingReport(true);
+                const payload: any = {
+                  user_id: user?.sub || 'anonymous',
+                  route_id: '',
+                  type: feedbackType,
+                  severity,
+                  location: {
+                    latitude: reportLocation.latitude,
+                    longitude: reportLocation.longitude,
+                  },
+                  description: reportText.trim(),
+                  attachments: [],
                 };
+
                 try {
-                  console.log('Submitting report', payload);
-                  // example: await fetch('/api/reports', { method: 'POST', body: JSON.stringify(payload) });
-                } catch (err) {
+                  const resp = await fetch('http://127.0.0.1:20004/v1/feedback/submit', {
+                    method: 'POST',
+                    headers: {
+                      accept: 'application/json',
+                      'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(payload),
+                  });
+
+                  if (!resp.ok) {
+                    const text = await resp.text().catch(() => resp.statusText);
+                    throw new Error(`HTTP ${resp.status}: ${text}`);
+                  }
+                
+              
+
+                  Alert.alert('Report submitted', '
+                Thank you for your feedback.');
+              
+                } catch (err: any) {
                   console.warn('Failed to submit report', err);
+                  Alert.alert('Submission failed', err?.message || 'Failed to submit report');
                 } finally {
+                  setIsSubmittingReport(false);
                   setShowReportModal(false);
                   setReportLocation(null);
                   setReportText('');
+                  setFeedbackType(null);
+                  setSeverity(null);
                 }
               }}
-              disabled={reportText.trim() === ''}
+              disabled={
+                isSubmittingReport || !feedbackType || !severity || reportText.trim() === ''
+              }
             >
-              <Text style={styles.modalSubmitText}>Submit</Text>
+              <Text style={styles.modalSubmitText}>
+                {isSubmittingReport ? 'Submitting...' : 'Submit Report'}
+              </Text>
             </Pressable>
           </Pressable>
         </Pressable>
