@@ -4,15 +4,18 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import ContactCard from '../../components/ui/ContactCard';
 import GradientBackground from '../../components/ui/GradientBackground';
 import SegmentedToggle from '../../components/ui/SegmentedToggle';
+import type { ITrustedContact } from '../../constants/mockData';
 import { mockContacts, STORAGE_KEYS } from '../../constants/mockData';
 import { Routes } from '../../constants/routes';
 import { colors } from '../../constants/theme';
@@ -182,6 +185,107 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  // Add Contact Modal (same style as Report modal)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#0F172A',
+    borderRadius: 20,
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  modalCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#0B1220',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalLabel: {
+    fontSize: 14,
+    color: '#CBD5F5',
+    marginBottom: 8,
+  },
+  modalInput: {
+    backgroundColor: '#0B1220',
+    borderRadius: 12,
+    padding: 12,
+    color: '#FFFFFF',
+    fontSize: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#1F2937',
+  },
+  modalInputMultiline: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  modalSubmitButton: {
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  modalSubmitButtonDisabled: {
+    backgroundColor: '#374151',
+  },
+  modalSubmitText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  pillButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: '#0B1220',
+    borderWidth: 1,
+    borderColor: '#374151',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  pillButtonSelected: {
+    backgroundColor: '#2563EB',
+    borderColor: '#2563EB',
+  },
+  pillButtonText: {
+    color: '#CBD5F5',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pillButtonTextSelected: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pillRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 12,
+  },
 });
 
 const Profile = () => {
@@ -193,6 +297,16 @@ const Profile = () => {
   const [voiceGuidanceIndex, setVoiceGuidanceIndex] = useState(0); // 0 = Yes, 1 = No
   const [unitsIndex, setUnitsIndex] = useState(0); // 0 = km, 1 = Mile
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+
+  // Trusted contacts: start from mock, then add user-created ones
+  const [contacts, setContacts] = useState<ITrustedContact[]>(mockContacts);
+  const [showAddContactModal, setShowAddContactModal] = useState(false);
+  const [addContactName, setAddContactName] = useState('');
+  const [addContactPhone, setAddContactPhone] = useState('');
+  const [addContactRelationship, setAddContactRelationship] = useState('');
+  const [addContactRole, setAddContactRole] = useState<'Emergency Contact' | 'Safety Check-in'>(
+    'Emergency Contact'
+  );
 
   // Load preferences from storage on mount
   useEffect(() => {
@@ -241,6 +355,40 @@ const Profile = () => {
   const handleMoreContact = (_contactId: string) => {
     // TODO: Implement more options menu
   };
+
+  const openAddContactModal = () => {
+    setAddContactName('');
+    setAddContactPhone('');
+    setAddContactRelationship('');
+    setAddContactRole('Emergency Contact');
+    setShowAddContactModal(true);
+  };
+
+  const closeAddContactModal = () => {
+    setShowAddContactModal(false);
+  };
+
+  const handleAddContactSubmit = () => {
+    const name = addContactName.trim();
+    const phone = addContactPhone.trim();
+    const relationship = addContactRelationship.trim();
+    if (!name || !phone || !relationship) return;
+
+    const newContact: ITrustedContact = {
+      id: `contact-${Date.now()}`,
+      name,
+      phone,
+      relationship,
+      role: addContactRole,
+    };
+    setContacts((prev) => [...prev, newContact]);
+    closeAddContactModal();
+  };
+
+  const canSubmitAddContact =
+    addContactName.trim() !== '' &&
+    addContactPhone.trim() !== '' &&
+    addContactRelationship.trim() !== '';
 
   // Format member since date
   const getMemberSinceDate = () =>
@@ -332,15 +480,11 @@ const Profile = () => {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Trusted Contacts</Text>
-              <Pressable
-                onPress={() => {
-                  /* TODO: Add new contact */
-                }}
-              >
+              <Pressable onPress={openAddContactModal}>
                 <Text style={styles.sectionAction}>+ Add New</Text>
               </Pressable>
             </View>
-            {mockContacts.map((contact) => (
+            {contacts.map((contact) => (
               <ContactCard
                 key={contact.id}
                 contact={contact}
@@ -408,6 +552,105 @@ const Profile = () => {
             </View>
           </View>
         </ScrollView>
+
+        {/* Add emergency contact modal (same style as Report unsafe location) */}
+        <Modal
+          visible={showAddContactModal}
+          transparent
+          animationType="fade"
+          onRequestClose={closeAddContactModal}
+        >
+          <Pressable style={styles.modalOverlay} onPress={closeAddContactModal}>
+            <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Add emergency contact</Text>
+                <Pressable style={styles.modalCloseButton} onPress={closeAddContactModal}>
+                  <Text style={{ fontSize: 16, color: '#FFF' }}>✕</Text>
+                </Pressable>
+              </View>
+
+              <Text style={styles.modalLabel}>Name</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="Contact name"
+                placeholderTextColor="#9CA3AF"
+                value={addContactName}
+                onChangeText={setAddContactName}
+              />
+
+              <Text style={styles.modalLabel}>Phone</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. +353 89 482 1083"
+                placeholderTextColor="#9CA3AF"
+                value={addContactPhone}
+                onChangeText={setAddContactPhone}
+                keyboardType="phone-pad"
+              />
+
+              <Text style={styles.modalLabel}>Relationship</Text>
+              <TextInput
+                style={styles.modalInput}
+                placeholder="e.g. Spouse, Friend, Boss"
+                placeholderTextColor="#9CA3AF"
+                value={addContactRelationship}
+                onChangeText={setAddContactRelationship}
+              />
+
+              <Text style={styles.modalLabel}>Role</Text>
+              <View style={styles.pillRow}>
+                <Pressable
+                  style={
+                    addContactRole === 'Emergency Contact'
+                      ? [styles.pillButton, styles.pillButtonSelected]
+                      : styles.pillButton
+                  }
+                  onPress={() => setAddContactRole('Emergency Contact')}
+                >
+                  <Text
+                    style={
+                      addContactRole === 'Emergency Contact'
+                        ? styles.pillButtonTextSelected
+                        : styles.pillButtonText
+                    }
+                  >
+                    Emergency Contact
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={
+                    addContactRole === 'Safety Check-in'
+                      ? [styles.pillButton, styles.pillButtonSelected]
+                      : styles.pillButton
+                  }
+                  onPress={() => setAddContactRole('Safety Check-in')}
+                >
+                  <Text
+                    style={
+                      addContactRole === 'Safety Check-in'
+                        ? styles.pillButtonTextSelected
+                        : styles.pillButtonText
+                    }
+                  >
+                    Safety Check-in
+                  </Text>
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={
+                  !canSubmitAddContact
+                    ? [styles.modalSubmitButton, styles.modalSubmitButtonDisabled]
+                    : styles.modalSubmitButton
+                }
+                onPress={handleAddContactSubmit}
+                disabled={!canSubmitAddContact}
+              >
+                <Text style={styles.modalSubmitText}>Add Contact</Text>
+              </Pressable>
+            </Pressable>
+          </Pressable>
+        </Modal>
       </View>
     </GradientBackground>
   );
