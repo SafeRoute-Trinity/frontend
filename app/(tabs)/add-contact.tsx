@@ -442,10 +442,7 @@ const AddContact = () => {
                 }}
               >
                 <Text
-                  style={[
-                    styles.dropdownButtonText,
-                    !relationship && styles.dropdownPlaceholder,
-                  ]}
+                  style={[styles.dropdownButtonText, !relationship && styles.dropdownPlaceholder]}
                 >
                   {relationship || 'Select relationship'}
                 </Text>
@@ -548,7 +545,8 @@ const AddContact = () => {
                           <Text
                             style={[
                               styles.dropdownItemText,
-                              countryCode.country === item.country && styles.dropdownItemTextSelected,
+                              countryCode.country === item.country &&
+                                styles.dropdownItemTextSelected,
                             ]}
                           >
                             {item.label} ({item.country})
@@ -601,9 +599,7 @@ const AddContact = () => {
                 ) : (
                   <Ionicons name="person-add" size={20} color={colors.textPrimary} />
                 )}
-                <Text style={styles.saveButtonText}>
-                  {isSaving ? 'Saving...' : 'Save Contact'}
-                </Text>
+                <Text style={styles.saveButtonText}>{isSaving ? 'Saving...' : 'Save Contact'}</Text>
               </Pressable>
             </View>
           </View>

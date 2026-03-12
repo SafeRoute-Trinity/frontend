@@ -138,9 +138,7 @@ const ContactCard = ({ contact, onCall, onRemove }: IContactCard) => {
     <View style={styles.wrapper}>
       <View style={styles.container}>
         <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarPlaceholderText}>
-            {contact.name.charAt(0).toUpperCase()}
-          </Text>
+          <Text style={styles.avatarPlaceholderText}>{contact.name.charAt(0).toUpperCase()}</Text>
         </View>
 
         <View style={styles.info}>
