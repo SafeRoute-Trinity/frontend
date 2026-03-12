@@ -14,6 +14,10 @@ const AlertsIcon = ({ color, size }: IIcon) => (
   <Ionicons name="notifications" size={size} color={color} />
 );
 
+const ContactsIcon = ({ color, size }: IIcon) => (
+  <Ionicons name="people" size={size} color={color} />
+);
+
 const ProfileIcon = ({ color, size }: IIcon) => (
   <Ionicons name="person" size={size} color={color} />
 );
@@ -53,6 +57,13 @@ const TabLayout = () => (
       }}
     />
     <Tabs.Screen
+      name={TabNames.CONTACTS}
+      options={{
+        title: 'Contacts',
+        tabBarIcon: ContactsIcon,
+      }}
+    />
+    <Tabs.Screen
       name={TabNames.PROFILE}
       options={{
         title: 'Profile',
@@ -67,6 +78,12 @@ const TabLayout = () => (
     />
     <Tabs.Screen
       name={TabNames.HELP}
+      options={{
+        href: null,
+      }}
+    />
+    <Tabs.Screen
+      name={TabNames.ADD_CONTACT}
       options={{
         href: null,
       }}

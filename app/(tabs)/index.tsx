@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import Mapbox, { Camera, LineLayer, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
@@ -204,11 +205,14 @@ const styles = StyleSheet.create({
   compassText: {
     fontSize: 20,
   },
-  locationButton: {
+  topRightControls: {
     position: 'absolute',
     right: 16,
-    bottom: 210,
+    top: 155,
     zIndex: 1000,
+    gap: 10,
+  },
+  locationButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -216,16 +220,32 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
   },
-  locationButtonIcon: {
-    fontSize: 20,
+  sosButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#DC2626',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#DC2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  sosButtonPressed: {
+    backgroundColor: '#B91C1C',
+  },
+  sosButtonText: {
+    fontSize: 11,
+    fontWeight: '900',
+    color: '#FFFFFF',
+    letterSpacing: 1,
   },
   zoomControls: {
     position: 'absolute',
@@ -986,14 +1006,24 @@ const Index = () => {
         </View>
       )}
 
-      {/* Current Location Button */}
+      {/* SOS & Recenter Buttons */}
       {location && (
-        <Pressable
-          style={({ pressed }) => [styles.locationButton, pressed && styles.buttonPressed]}
-          onPress={handleCenterOnLocation}
-        >
-          <Text style={styles.locationButtonIcon}>🔵</Text>
-        </Pressable>
+        <View style={styles.topRightControls}>
+          <Pressable
+            style={({ pressed }) => [styles.sosButton, pressed && styles.sosButtonPressed]}
+            onPress={() => {
+              // TODO: Implement SOS functionality
+            }}
+          >
+            <Text style={styles.sosButtonText}>SOS</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.locationButton, pressed && styles.buttonPressed]}
+            onPress={handleCenterOnLocation}
+          >
+            <Ionicons name="locate" size={22} color="#1F2937" />
+          </Pressable>
+        </View>
       )}
 
       {/* Zoom Controls */}

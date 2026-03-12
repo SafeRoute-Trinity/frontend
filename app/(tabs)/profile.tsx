@@ -10,10 +10,9 @@ import {
   Text,
   View,
 } from 'react-native';
-import ContactCard from '../../components/ui/ContactCard';
 import GradientBackground from '../../components/ui/GradientBackground';
 import SegmentedToggle from '../../components/ui/SegmentedToggle';
-import { mockContacts, STORAGE_KEYS } from '../../constants/mockData';
+import { STORAGE_KEYS } from '../../constants/mockData';
 import { Routes } from '../../constants/routes';
 import { colors } from '../../constants/theme';
 import { useAuth0 } from '../../contexts/Auth0Context';
@@ -125,11 +124,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
     textTransform: 'uppercase',
   },
-  sectionAction: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.accent,
-  },
   card: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -141,14 +135,6 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: colors.border,
     marginVertical: 16,
-  },
-  // Trusted Contacts
-  contactsNote: {
-    fontSize: 12,
-    color: colors.textMuted,
-    fontStyle: 'italic',
-    marginTop: 8,
-    lineHeight: 18,
   },
   // Account Settings
   settingsRow: {
@@ -232,14 +218,6 @@ const Profile = () => {
     await logout();
     router.replace(Routes.LOGIN);
     setIsLoggingOut(false);
-  };
-
-  const handleCallContact = (_contactId: string) => {
-    // TODO: Implement calling functionality
-  };
-
-  const handleMoreContact = (_contactId: string) => {
-    // TODO: Implement more options menu
   };
 
   // Format member since date
@@ -326,32 +304,6 @@ const Profile = () => {
                 label="Distance Units"
               />
             </View>
-          </View>
-
-          {/* Trusted Contacts Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Trusted Contacts</Text>
-              <Pressable
-                onPress={() => {
-                  /* TODO: Add new contact */
-                }}
-              >
-                <Text style={styles.sectionAction}>+ Add New</Text>
-              </Pressable>
-            </View>
-            {mockContacts.map((contact) => (
-              <ContactCard
-                key={contact.id}
-                contact={contact}
-                onCall={() => handleCallContact(contact.id)}
-                onMore={() => handleMoreContact(contact.id)}
-              />
-            ))}
-            <Text style={styles.contactsNote}>
-              * These contacts will be notified automatically if you trigger an SOS or fail to reach
-              your destination on time.
-            </Text>
           </View>
 
           {/* Account Settings Section */}
