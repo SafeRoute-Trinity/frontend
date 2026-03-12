@@ -278,8 +278,6 @@ const Help = () => {
           content: feedbackText.trim(),
           privacy_accepted: privacyAccepted,
           captcha_token: recaptchaToken,
-          user_id: user?.sub ?? undefined, // from your auth context
-          email: user?.email ?? undefined, // from your auth context
           subject: 'App Feedback',
           user_agent: `${Platform.OS} ${Platform.Version}`,
         }),
