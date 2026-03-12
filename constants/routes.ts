@@ -5,6 +5,8 @@ export enum TabNames {
   PROFILE = 'profile',
   PERSONAL_INFO = 'personal-info',
   HELP = 'help',
+  CONTACTS = 'contacts',
+  ADD_CONTACT = 'add-contact',
 }
 
 // Route paths for app navigation
