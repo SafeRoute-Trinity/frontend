@@ -1,5 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
-import { API_PROFILE, coreEndpoints } from './config/core-endpoints.ts';
+import { API_PROFILE, coreEndpoints } from './config/core-endpoints';
 
 const AUTH0_SCHEME = 'saferouteapp';
 

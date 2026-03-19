@@ -908,7 +908,7 @@ const extractHeadingDegrees = (heading: Location.LocationHeadingObject): number 
     return normalizeHeadingDegrees(trueHeading);
   }
 
-  const { magneticHeading } = heading;
+  const magneticHeading = heading.magHeading;
   if (
     typeof magneticHeading === 'number' &&
     Number.isFinite(magneticHeading) &&
@@ -2961,17 +2961,21 @@ const Index = () => {
                   lineOpacity: 0.8,
                 }}
               />
-              {selectedRouteSegment?.featureId && (
-                <LineLayer
-                  id="routeLineSelected"
-                  filter={['==', ['get', 'feature_id'], selectedRouteSegment.featureId] as any}
-                  style={{
-                    lineColor: '#F8FAFC',
-                    lineWidth: 7,
-                    lineOpacity: 0.95,
-                  }}
-                />
-              )}
+              <LineLayer
+                id="routeLineSelected"
+                filter={
+                  [
+                    '==',
+                    ['get', 'feature_id'],
+                    selectedRouteSegment?.featureId ?? '__no_selected_segment__',
+                  ] as any
+                }
+                style={{
+                  lineColor: '#F8FAFC',
+                  lineWidth: 7,
+                  lineOpacity: 0.95,
+                }}
+              />
             </ShapeSource>
           )}
           {routeStart && (
