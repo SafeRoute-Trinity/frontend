@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -156,8 +157,69 @@ const Contacts = () => {
     }, [loadContacts])
   );
 
-  const handleCallContact = (_contactId: string) => {
-    // TODO: Implement calling functionality
+  const [callingContactId, setCallingContactId] = useState<string | null>(null);
+
+  const handleCallContact = async (contactId: string) => {
+    if (!userId) {
+      Alert.alert('Error', 'User not authenticated');
+      return;
+    }
+    if (callingContactId !== null) return;
+
+    const contact = contacts.find((c) => c.contact_id === contactId);
+    if (!contact) return;
+
+    setCallingContactId(contactId);
+    try {
+      let lat = 0;
+      let lon = 0;
+      let accuracyM = 0;
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+        accuracyM = pos.coords.accuracy ?? 0;
+      }
+
+      const resp = await fetch('http://localhost:20006/v1/emergency/sms', {
+        method: 'POST',
+        headers: { accept: 'application/json', 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sos_id: '00000000-0000-0000-0000-000000000000',
+          user_id: userId,
+          location: { lat, lon, accuracy_m: accuracyM },
+          emergency_contact: { name: contact.name, phone: contact.phone },
+          message_template: 'sos',
+          variables: {},
+          notification_type: 'sos',
+          locale: 'en',
+        }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        let detail = text;
+        try {
+          const parsed = JSON.parse(text);
+          if (typeof parsed?.detail === 'string') detail = parsed.detail;
+          else if (parsed?.detail !== undefined) detail = JSON.stringify(parsed.detail);
+          else detail = JSON.stringify(parsed);
+        } catch {
+          /* keep raw text */
+        }
+        throw new Error(`HTTP ${resp.status}: ${detail}`);
+      }
+
+      Alert.alert('✅ Alert Sent', `${contact.name} has been notified of your emergency.`);
+    } catch (err: any) {
+      const msg = typeof err?.message === 'string' ? err.message : JSON.stringify(err);
+      Alert.alert('Failed to Send Alert', msg || 'Failed to notify emergency contact');
+    } finally {
+      setCallingContactId(null);
+    }
   };
 
   const handleRemoveContact = (contact: ITrustedContact) => {
@@ -244,6 +306,7 @@ const Contacts = () => {
                     contact={contact}
                     onCall={() => handleCallContact(contact.contact_id)}
                     onRemove={() => handleRemoveContact(contact)}
+                    isCalling={callingContactId === contact.contact_id}
                   />
                 ))
               )}
