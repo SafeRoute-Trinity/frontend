@@ -374,6 +374,12 @@ const Alerts = () => {
     return undefined;
   }, [phase, progressBarAnim]);
 
+  // ── Derived ──────────────────────────────────────────────────────────────
+  const primaryContact = contacts.find((c) => c.is_primary) ?? null;
+  primaryContactRef.current = primaryContact;
+  const isActive = phase === 'countdown' || phase === 'sent';
+  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+
   // ── Send SOS SMS ────────────────────────────────────────────────────────
   const triggerSOS = async () => {
     const contact = primaryContactRef.current;
@@ -473,12 +479,6 @@ const Alerts = () => {
     setPhase('idle');
     holdProgress.setValue(0);
   };
-
-  // ── Derived ──────────────────────────────────────────────────────────────
-  const primaryContact = contacts.find((c) => c.is_primary) ?? null;
-  primaryContactRef.current = primaryContact;
-  const isActive = phase === 'countdown' || phase === 'sent';
-  const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (
