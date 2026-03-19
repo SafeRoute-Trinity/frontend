@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import Recaptcha, { RecaptchaRef } from 'react-native-recaptcha-that-works';
 import GradientBackground from '../../components/ui/GradientBackground';
+import { API_URL } from '../../config/api';
 import { InputFocus, InputFocusType } from '../../constants/routes';
 import { colors } from '../../constants/theme';
 
@@ -251,7 +252,7 @@ const Help = () => {
   const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const handleOpenTerms = () => {
-    Linking.openURL('https://saferoutemap.duckdns.org/terms');
+    Linking.openURL(`${API_URL}/terms`);
   };
 
   const handleAppInfo = () => {
@@ -271,7 +272,7 @@ const Help = () => {
 
     try {
       // const response = await fetch('http://10.0.2.2:20004/v1/system-feedback/submit', {
-      const response = await fetch('https://saferoutemap.duckdns.org/v1/system-feedback/submit', {
+      const response = await fetch(`${API_URL}/v1/system-feedback/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -345,13 +346,13 @@ const Help = () => {
           {/* Help Menu */}
           <View style={styles.section}>
             <View style={styles.card}>
-              <HelpMenuItem
+              {/* <HelpMenuItem
                 icon="help-circle-outline"
                 title="Help center"
                 subtitle="Get help with using SafeRoute"
                 onPress={() => setShowHelpModal(true)}
               />
-              <View style={styles.cardDivider} />
+              <View style={styles.cardDivider} /> */}
               <HelpMenuItem
                 icon="chatbubble-outline"
                 title="Send feedback"
@@ -377,7 +378,7 @@ const Help = () => {
         </ScrollView>
 
         {/* Help Center Modal */}
-        <Modal
+        {/* <Modal
           visible={showHelpModal}
           transparent
           animationType="fade"
@@ -417,7 +418,7 @@ const Help = () => {
               </Pressable>
             </Pressable>
           </Pressable>
-        </Modal>
+        </Modal> */}
 
         {/* Feedback Modal */}
         <Modal
@@ -464,7 +465,7 @@ const Help = () => {
                   I read and accept the{' '}
                   <Text
                     style={styles.checkboxLink}
-                    onPress={() => Linking.openURL('https://saferoute.app/terms')}
+                    onPress={() => Linking.openURL(`${API_URL}/terms`)}
                   >
                     privacy policy
                   </Text>
@@ -516,7 +517,7 @@ const Help = () => {
         <Recaptcha
           ref={recaptchaRef}
           siteKey={RECAPTCHA_SITE_KEY}
-          baseUrl="https://saferoutemap.duckdns.org"
+          baseUrl={API_URL}
           onVerify={handleRecaptchaVerify}
           onExpire={handleRecaptchaExpire}
           onError={(err) => {
