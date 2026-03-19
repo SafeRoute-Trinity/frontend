@@ -1,10 +1,10 @@
 import { Platform } from 'react-native';
+import { coreEndpoints } from './core-endpoints';
 
 // Determine API URL based on platform
 const getApiUrl = () => {
-  // For production, you would use an environment variable
-  if (process.env.EXPO_PUBLIC_API_URL) {
-    return process.env.EXPO_PUBLIC_API_URL;
+  if (coreEndpoints.backendBaseUrl) {
+    return coreEndpoints.backendBaseUrl;
   }
 
   // Development defaults
