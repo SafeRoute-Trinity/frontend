@@ -347,23 +347,7 @@ const AddContact = () => {
     } catch (err: any) {
       console.error('Failed to save contact:', err);
       const msg = err.message || '';
-
-      // Backend returns 400 when another primary already exists
-      if (asPrimary && (msg.toLowerCase().includes('primary') || msg.includes('400'))) {
-        Alert.alert(
-          'Primary Contact Exists',
-          'Another contact is already set as primary. Remove them as primary first, or save this contact without the primary flag.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Save Without Primary',
-              onPress: () => saveContact(false),
-            },
-          ]
-        );
-      } else {
-        Alert.alert('Error', msg || 'Failed to save contact. Please try again.');
-      }
+      Alert.alert('Error', msg || 'Failed to save contact. Please try again.');
     } finally {
       setIsSaving(false);
     }
