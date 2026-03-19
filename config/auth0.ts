@@ -7,10 +7,12 @@ import { Platform } from 'react-native';
 const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferouteapp.eu.auth0.com';
 const AUTH0_CLIENT_ID =
   process.env.EXPO_PUBLIC_AUTH0_CLIENT_ID || 'ZHAiPyzoAyaaiKM0do7J05YNUrLgXFcG';
+const AUTH0_AUDIENCE = process.env.EXPO_PUBLIC_AUTH0_AUDIENCE;
 
 export const auth0Config = {
   domain: AUTH0_DOMAIN,
   clientId: AUTH0_CLIENT_ID,
+  audience: AUTH0_AUDIENCE,
 };
 
 // Lazy initialization of Auth0 to avoid loading native module until it's actually needed
@@ -80,13 +82,6 @@ export const getAuth0 = () => {
 };
 
 // For backward compatibility, export auth0 as a getter
-// This will be null if the native module isn't available
-export const auth0 = new Proxy({} as any, {
-  get(_target, prop) {
-    const instance = initializeAuth0();
-    if (instance === null) {
-      return undefined;
-    }
-    return instance[prop];
-  },
-});
+// Avoid Proxy-based lazy access because property introspection can
+// unintentionally trigger native initialization in development.
+export const auth0: any = null;

@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { API_PROFILE, coreEndpoints } from '../config/core-endpoints';
 
 type ServiceStatusState = 'idle' | 'checking' | 'ok' | 'error' | 'skipped';
 
@@ -37,31 +38,31 @@ const getServices = (): ServiceDefinition[] => [
     id: 'user-management',
     name: 'User Management',
     description: 'Checks user management service health endpoint',
-    url: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL || undefined,
+    url: coreEndpoints.userManagementHealthUrl || undefined,
   },
   {
     id: 'notification-service',
     name: 'Notification Service',
     description: 'Verifies notification service health endpoint',
-    url: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL || undefined,
+    url: coreEndpoints.notificationServiceHealthUrl || undefined,
   },
   {
     id: 'routing-service',
     name: 'Routing Service',
     description: 'Checks routing service health endpoint',
-    url: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL || undefined,
+    url: coreEndpoints.routingServiceHealthUrl || undefined,
   },
   {
     id: 'feedback-service',
     name: 'Feedback Service',
     description: 'Verifies feedback service health endpoint',
-    url: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL || undefined,
+    url: coreEndpoints.feedbackServiceHealthUrl || undefined,
   },
   {
     id: 'sos-service',
     name: 'SOS Service',
     description: 'Checks SOS (emergency) service health endpoint',
-    url: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL || undefined,
+    url: coreEndpoints.sosServiceHealthUrl || undefined,
   },
 ];
 
@@ -474,7 +475,8 @@ const Health = () => {
           <View style={styles.headerLeft}>
             <Text style={styles.title}>SafeRoute Connectivity</Text>
             <Text style={styles.subtitle}>
-              Quick health snapshot across critical platform services.
+              Quick health snapshot across critical platform services. Profile:{' '}
+              {API_PROFILE.toUpperCase()}
             </Text>
           </View>
           <Pressable
@@ -504,9 +506,7 @@ const Health = () => {
         {lastCheckedAt ? (
           <Text style={styles.lastChecked}>Last checked: {lastCheckedAt.toLocaleTimeString()}</Text>
         ) : (
-          <Text style={styles.lastChecked}>
-            Configure the EXPO_PUBLIC_* environment variables to enable checks.
-          </Text>
+          <Text style={styles.lastChecked}>Profile is {API_PROFILE.toUpperCase()}.</Text>
         )}
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

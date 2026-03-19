@@ -1,7 +1,6 @@
 import type { ExpoConfig } from 'expo/config';
+import { API_PROFILE, coreEndpoints } from './config/core-endpoints';
 
-// Auth0 configuration - get from environment variables or use defaults
-const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
 const AUTH0_SCHEME = 'saferouteapp';
 
 const config: ExpoConfig = {
@@ -71,11 +70,13 @@ const config: ExpoConfig = {
     reactCompiler: true,
   },
   extra: {
-    userManagementHealthUrl: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL,
-    notificationServiceHealthUrl: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL,
-    routingServiceHealthUrl: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL,
-    feedbackServiceHealthUrl: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL,
-    sosServiceHealthUrl: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL,
+    apiProfile: API_PROFILE,
+    apiBaseUrl: coreEndpoints.backendBaseUrl,
+    userManagementHealthUrl: coreEndpoints.userManagementHealthUrl,
+    notificationServiceHealthUrl: coreEndpoints.notificationServiceHealthUrl,
+    routingServiceHealthUrl: coreEndpoints.routingServiceHealthUrl,
+    feedbackServiceHealthUrl: coreEndpoints.feedbackServiceHealthUrl,
+    sosServiceHealthUrl: coreEndpoints.sosServiceHealthUrl,
     mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
   },
 };
