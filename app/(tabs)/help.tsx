@@ -243,9 +243,9 @@ const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
 const Help = () => {
   const router = useRouter();
   const recaptchaRef = useRef<RecaptchaRef>(null);
-  const [showHelpModal, setShowHelpModal] = useState(false);
+  // const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [helpQuery, setHelpQuery] = useState('');
+  // const [helpQuery, setHelpQuery] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [inputFocused, setInputFocused] = useState<InputFocusType>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
@@ -259,13 +259,13 @@ const Help = () => {
     // TODO: Show app info modal
   };
 
-  const handleSubmitHelp = () => {
-    if (helpQuery.trim()) {
-      // TODO: Submit help query to backend
-      setHelpQuery('');
-      setShowHelpModal(false);
-    }
-  };
+  // const handleSubmitHelp = () => {
+  //   if (helpQuery.trim()) {
+  //     // TODO: Submit help query to backend
+  //     setHelpQuery('');
+  //     setShowHelpModal(false);
+  //   }
+  // };
 
   const handleSubmitFeedback = async () => {
     if (!feedbackText.trim() || !privacyAccepted || !recaptchaToken) return;
