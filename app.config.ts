@@ -1,7 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
 // Auth0 configuration - get from environment variables or use defaults
-const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
+const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferouteapp.eu.auth0.com';
 const AUTH0_SCHEME = 'saferouteapp';
 
 const config: ExpoConfig = {
@@ -41,6 +41,13 @@ const config: ExpoConfig = {
   plugins: [
     'expo-router',
     [
+      'react-native-auth0',
+      {
+        domain: AUTH0_DOMAIN,
+        customScheme: AUTH0_SCHEME,
+      },
+    ],
+    [
       'expo-splash-screen',
       {
         image: './assets/images/splash-icon.png',
@@ -71,6 +78,9 @@ const config: ExpoConfig = {
     reactCompiler: true,
   },
   extra: {
+    eas: {
+      projectId: '30887207-a650-4dbc-a2d8-44c74ad412ad',
+    },
     userManagementHealthUrl: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL,
     notificationServiceHealthUrl: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL,
     routingServiceHealthUrl: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL,
