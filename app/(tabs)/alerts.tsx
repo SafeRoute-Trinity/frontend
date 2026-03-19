@@ -381,7 +381,7 @@ const Alerts = () => {
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
   // ── Send SOS SMS ────────────────────────────────────────────────────────
-  const triggerSOS = async () => {
+  const triggerSOS = useCallback(async () => {
     const contact = primaryContactRef.current;
     if (!contact) {
       console.warn('No primary contact – skipping SOS SMS');
@@ -390,10 +390,7 @@ const Alerts = () => {
     }
 
     try {
-      const sosId = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-        const r = (Math.random() * 16) | 0;
-        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
-      });
+      const sosId = crypto.randomUUID();
       const res = await sendEmergencySMS({
         sos_id: sosId,
         user_id: userId,
@@ -418,7 +415,11 @@ const Alerts = () => {
       setPhase('sent');
       if (!silentAlert) Vibration.vibrate([0, 200, 100, 200]);
     }
-  };
+  }, [silentAlert, userId, user?.name]);
+
+  // Keep a ref so the interval callback always sees the latest triggerSOS
+  const triggerSOSRef = useRef(triggerSOS);
+  triggerSOSRef.current = triggerSOS;
 
   // ── Countdown timer ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -429,7 +430,7 @@ const Alerts = () => {
       setCountdown((prev) => {
         if (prev <= 1) {
           clearInterval(countdownInterval.current!);
-          triggerSOS();
+          triggerSOSRef.current();
           return 0;
         }
         return prev - 1;
@@ -439,7 +440,7 @@ const Alerts = () => {
     return () => {
       if (countdownInterval.current) clearInterval(countdownInterval.current);
     };
-  }, [phase, silentAlert, primaryContact]);
+  }, [phase]);
 
   // ── Hold handlers ────────────────────────────────────────────────────────
   const onHoldStart = () => {
