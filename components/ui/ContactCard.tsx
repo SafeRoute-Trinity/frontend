@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import type { ITrustedContact } from '../../constants/mockData';
 import { colors } from '../../constants/theme';
 
@@ -8,6 +8,7 @@ interface IContactCard {
   contact: ITrustedContact;
   onCall?: () => void;
   onRemove?: () => void;
+  isCalling?: boolean;
 }
 
 const styles = StyleSheet.create({
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
   },
 });
 
-const ContactCard = ({ contact, onCall, onRemove }: IContactCard) => {
+const ContactCard = ({ contact, onCall, onRemove, isCalling = false }: IContactCard) => {
   const [showMenu, setShowMenu] = useState(false);
 
   return (
@@ -166,8 +167,13 @@ const ContactCard = ({ contact, onCall, onRemove }: IContactCard) => {
           <Pressable
             style={({ pressed }) => [styles.actionButton, pressed && styles.actionButtonPressed]}
             onPress={onCall}
+            disabled={isCalling}
           >
-            <Ionicons name="call" size={16} color={colors.textPrimary} />
+            {isCalling ? (
+              <ActivityIndicator size="small" color={colors.textPrimary} />
+            ) : (
+              <Ionicons name="call" size={16} color={colors.textPrimary} />
+            )}
           </Pressable>
           <Pressable
             style={({ pressed }) => [styles.menuButton, pressed && styles.actionButtonPressed]}
