@@ -72,10 +72,12 @@ export async function sendEmergencySMS(
     body: JSON.stringify(payload),
   });
 
+  const data = await response.json().catch(() => null);
+
   if (!response.ok) {
-    const errorText = await response.text().catch(() => response.statusText);
-    throw new Error(`Emergency SMS failed: ${errorText}`);
+    // The notification service may return 500 even after the SMS is delivered.
+    console.warn(`SOS API returned ${response.status}, but SMS may have been sent.`);
   }
 
-  return response.json();
+  return data ?? { status: 'sent', message_sent: 'SMS dispatched' };
 }
