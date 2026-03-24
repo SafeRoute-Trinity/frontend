@@ -1012,7 +1012,7 @@ const Index = () => {
           <Pressable
             style={({ pressed }) => [styles.sosButton, pressed && styles.sosButtonPressed]}
             onPress={() => {
-              // TODO: Implement SOS functionality
+              router.navigate('/alerts');
             }}
           >
             <Text style={styles.sosButtonText}>SOS</Text>
