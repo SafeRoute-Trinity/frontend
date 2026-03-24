@@ -1,9 +1,14 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
+  Image,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -288,6 +293,57 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#FFF',
   },
+  // Location permission screen styles
+  permissionScreen: {
+    flex: 1,
+    backgroundColor: '#1A2332',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  permissionImageContainer: {
+    width: 220,
+    height: 220,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 40,
+  },
+  permissionImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  permissionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  permissionDescription: {
+    fontSize: 15,
+    color: '#8A95A8',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 60,
+    paddingHorizontal: 8,
+  },
+  permissionButton: {
+    width: '100%',
+    backgroundColor: '#4A8B7F',
+    borderRadius: 28,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  permissionButtonPressed: {
+    backgroundColor: '#3D7468',
+  },
+  permissionButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
 });
 
 // ── Component ────────────────────────────────────────────────────────────────
@@ -302,6 +358,11 @@ const Alerts = () => {
   const [contacts, setContacts] = useState<ITrustedContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
+  const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   // ── Refs ──────────────────────────────────────────────────────────────────
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -310,6 +371,53 @@ const Alerts = () => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressBarAnim = useRef(new Animated.Value(0)).current;
   const primaryContactRef = useRef<ITrustedContact | null>(null);
+  const userLocationRef = useRef(userLocation);
+  userLocationRef.current = userLocation;
+
+  // ── Location permission ──────────────────────────────────────────────────
+  const requestLocationPermission = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status === 'granted') {
+      setLocationPermission(true);
+      try {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      } catch (err) {
+        console.error('Failed to get location:', err);
+      }
+    } else {
+      setLocationPermission(false);
+    }
+  };
+
+  const handleAllowLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status === 'granted') {
+      await requestLocationPermission();
+    } else {
+      Alert.alert(
+        'Location Permission Required',
+        'Please enable location access in your device settings to use the SOS feature.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open Settings',
+            onPress: () => {
+              if (Platform.OS === 'ios') {
+                Linking.openURL('app-settings:');
+              } else {
+                Linking.openSettings();
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  useEffect(() => {
+    requestLocationPermission();
+  }, []);
 
   // ── Fetch contacts on focus ──────────────────────────────────────────────
   useFocusEffect(
@@ -394,7 +502,9 @@ const Alerts = () => {
       const res = await sendEmergencySMS({
         sos_id: sosId,
         user_id: userId,
-        location: null, // TODO: attach live GPS location
+        location: userLocationRef.current
+          ? { lat: userLocationRef.current.latitude, lon: userLocationRef.current.longitude }
+          : null,
         emergency_contact: {
           name: contact.name,
           phone: contact.phone,
@@ -482,6 +592,35 @@ const Alerts = () => {
   };
 
   // ── Render ───────────────────────────────────────────────────────────────
+
+  // Show permission screen if location denied
+  if (locationPermission === false) {
+    return (
+      <View style={styles.permissionScreen}>
+        <View style={styles.permissionImageContainer}>
+          <Image
+            source={require('../../assets/images/location-pin.png')}
+            style={styles.permissionImage}
+          />
+        </View>
+        <Text style={styles.permissionTitle}>Enable location to get started</Text>
+        <Text style={styles.permissionDescription}>
+          SafeRoute uses your location to analyze street safety data and guide you on the most
+          secure path to your destination.
+        </Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.permissionButton,
+            pressed && styles.permissionButtonPressed,
+          ]}
+          onPress={handleAllowLocation}
+        >
+          <Text style={styles.permissionButtonText}>Allow Location Access</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   return (
     <GradientBackground>
       <View style={styles.container}>
