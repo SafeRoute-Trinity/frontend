@@ -7,13 +7,17 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Image,
+  Linking,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { API_URL } from '../../config/api';
 import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
 import { useAuth0 } from '../../contexts/Auth0Context';
 
@@ -28,8 +32,7 @@ if (MAPBOX_ACCESS_TOKEN) {
 
 // Feedback submit endpoint - configurable via EXPO_PUBLIC_FEEDBACK_SUBMIT_URL
 const FEEDBACK_SUBMIT_URL =
-  process.env.EXPO_PUBLIC_FEEDBACK_SUBMIT_URL ||
-  'https://saferoutemap.duckdns.org/v1/feedback/submit';
+  process.env.EXPO_PUBLIC_FEEDBACK_SUBMIT_URL || `${API_URL}/v1/feedback/submit`;
 
 interface LocationData {
   latitude: number;
@@ -70,6 +73,65 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     padding: 16,
+  },
+  // Location permission screen styles
+  permissionScreen: {
+    flex: 1,
+    backgroundColor: '#1A2332',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  permissionImageContainer: {
+    width: 220,
+    height: 220,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 40,
+  },
+  permissionImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  permissionTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  permissionDescription: {
+    fontSize: 15,
+    color: '#8A95A8',
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 60,
+    paddingHorizontal: 8,
+  },
+  permissionButton: {
+    width: '100%',
+    backgroundColor: '#4A8B7F',
+    borderRadius: 28,
+    paddingVertical: 16,
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  permissionButtonPressed: {
+    backgroundColor: '#3D7468',
+  },
+  permissionButtonText: {
+    fontSize: 17,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  permissionManualText: {
+    fontSize: 15,
+    color: '#8A95A8',
+    textAlign: 'center',
+  },
+  permissionManualTextPressed: {
+    color: '#B0BEC5',
   },
   markerContainer: {
     alignItems: 'center',
@@ -595,40 +657,69 @@ const Index = () => {
     }, 100);
   };
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setIsLoadingLocation(true);
-        setLocationError(null);
+  const requestLocationPermission = async () => {
+    try {
+      setIsLoadingLocation(true);
+      setLocationError(null);
 
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          setLocationError('Location permission denied');
-          setIsLoadingLocation(false);
-          return;
-        }
-
-        const currentLocation = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High,
-        });
-
-        const { latitude, longitude } = currentLocation.coords;
-
-        // Detect simulator default location (San Francisco area) and use Dublin instead
-        const isSanFranciscoDefault =
-          Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
-
-        const newLocation = isSanFranciscoDefault ? DEFAULT_LOCATION : { latitude, longitude };
-
-        setLocation(newLocation);
-        setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
-      } catch (error) {
-        console.error('Error getting location:', error);
-        setLocationError('Failed to get location');
-      } finally {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Location permission denied');
         setIsLoadingLocation(false);
+        return;
       }
-    })();
+
+      const currentLocation = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
+      const { latitude, longitude } = currentLocation.coords;
+
+      // Detect simulator default location (San Francisco area) and use Dublin instead
+      const isSanFranciscoDefault =
+        Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
+
+      const newLocation = isSanFranciscoDefault ? DEFAULT_LOCATION : { latitude, longitude };
+
+      setLocation(newLocation);
+      setCenterCoordinate([newLocation.longitude, newLocation.latitude]);
+    } catch (error) {
+      console.error('Error getting location:', error);
+      setLocationError('Failed to get location');
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  const handleAllowLocation = async () => {
+    // First try requesting permission again (works if user hasn't permanently denied)
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status === 'granted') {
+      await requestLocationPermission();
+    } else {
+      // If permanently denied, guide user to settings
+      Alert.alert(
+        'Location Permission Required',
+        'Please enable location access in your device settings to use SafeRoute.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Open Settings',
+            onPress: () => {
+              if (Platform.OS === 'ios') {
+                Linking.openURL('app-settings:');
+              } else {
+                Linking.openSettings();
+              }
+            },
+          },
+        ]
+      );
+    }
+  };
+
+  useEffect(() => {
+    requestLocationPermission();
   }, []);
 
   const searchPlaces = async (query: string) => {
@@ -700,7 +791,7 @@ const Index = () => {
     const endLat = 53.34446845655061;
     const endLon = -6.259457236376844;
 
-    const baseUrl = 'https://saferoutemap.duckdns.org/route';
+    const baseUrl = `${API_URL}/route`;
     const url1 = `${baseUrl}?start=${startLat},${startLon}&end=${endLat},${endLon}&profile=foot-walking`;
     const url2 = `${baseUrl}?start=${startLat}%2C${startLon}&end=${endLat}%2C${endLon}&profile=foot-walking`;
 
@@ -815,11 +906,7 @@ const Index = () => {
     }
 
     if (locationError) {
-      return (
-        <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapErrorText}>{locationError}</Text>
-        </View>
-      );
+      return null; // Full permission screen rendered at component level
     }
 
     if (location) {
@@ -914,6 +1001,34 @@ const Index = () => {
 
     return null;
   };
+
+  // Show full-screen permission screen when location is denied
+  if (locationError && !isLoadingLocation) {
+    return (
+      <View style={styles.permissionScreen}>
+        <View style={styles.permissionImageContainer}>
+          <Image
+            source={require('../../assets/images/location-pin.png')}
+            style={styles.permissionImage}
+          />
+        </View>
+        <Text style={styles.permissionTitle}>Enable location to get started</Text>
+        <Text style={styles.permissionDescription}>
+          SafeRoute uses your location to analyze street safety data and guide you on the most
+          secure path to your destination.
+        </Text>
+        <Pressable
+          style={({ pressed }) => [
+            styles.permissionButton,
+            pressed && styles.permissionButtonPressed,
+          ]}
+          onPress={handleAllowLocation}
+        >
+          <Text style={styles.permissionButtonText}>Allow Location Access</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
