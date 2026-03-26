@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { randomUUID } from 'expo-crypto';
 import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -498,7 +499,7 @@ const Alerts = () => {
     }
 
     try {
-      const sosId = crypto.randomUUID();
+      const sosId = randomUUID();
       const res = await sendEmergencySMS({
         sos_id: sosId,
         user_id: userId,
