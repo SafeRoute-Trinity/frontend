@@ -1,7 +1,7 @@
 import { SOS_API_URL } from '../config/api';
-import { AUTH_KEYS } from './client';
-import { storage } from '../utils/storage';
 import { getDeviceId } from '../utils/device';
+import { storage } from '../utils/storage';
+import { AUTH_KEYS } from './client';
 
 /* eslint-disable no-console */
 

@@ -1008,7 +1008,7 @@ const Index = () => {
       <View style={styles.permissionScreen}>
         <View style={styles.permissionImageContainer}>
           <Image
-            source={require('../../assets/images/location-pin.png')}
+            source={require('../../assets/images/location-pin.jpg')}
             style={styles.permissionImage}
           />
         </View>

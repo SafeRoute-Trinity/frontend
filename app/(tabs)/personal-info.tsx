@@ -239,7 +239,7 @@ const PersonalInfo = () => {
           <View style={styles.header}>
             <Pressable
               style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
-              onPress={() => router.back()}
+              onPress={() => router.navigate('/(tabs)/profile')}
             >
               <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
             </Pressable>
@@ -280,7 +280,7 @@ const PersonalInfo = () => {
           {/* Account ID */}
           <View style={styles.accountIdContainer}>
             <Text style={styles.accountIdLabel}>Account ID</Text>
-            <Text style={styles.accountIdValue}>{user.sub}</Text>
+            <Text style={styles.accountIdValue}>{user.sub?.replace(/^auth0\|/, '')}</Text>
           </View>
         </ScrollView>
 
