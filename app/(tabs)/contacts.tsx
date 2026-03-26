@@ -14,6 +14,7 @@ import {
 import { fetchTrustedContacts, replaceTrustedContacts } from '../../api/contacts';
 import ContactCard from '../../components/ui/ContactCard';
 import GradientBackground from '../../components/ui/GradientBackground';
+import { API_URL } from '../../config/api';
 import { ITrustedContact } from '../../constants/mockData';
 import { colors } from '../../constants/theme';
 import { useAuth0 } from '../../contexts/Auth0Context';
@@ -182,7 +183,7 @@ const Contacts = () => {
         lon = pos.coords.longitude;
       }
 
-      const resp = await fetch('http://localhost:20006/v1/emergency/call', {
+      const resp = await fetch(`${API_URL}/v1/emergency/call`, {
         method: 'POST',
         headers: { accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({

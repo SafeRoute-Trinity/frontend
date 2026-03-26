@@ -23,8 +23,8 @@ export const API_URL = getApiUrl();
 
 // SOS service (separate microservice, no gateway proxy yet)
 const getSosApiUrl = () => {
-  if (process.env.EXPO_PUBLIC_SOS_API_URL) {
-    return process.env.EXPO_PUBLIC_SOS_API_URL;
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
   }
   if (Platform.OS === 'android') {
     return 'http://10.0.2.2:20006';

@@ -370,7 +370,7 @@ const AddContact = () => {
           <View style={styles.header}>
             <Pressable
               style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
-              onPress={() => router.back()}
+              onPress={() => router.navigate('/(tabs)/contacts')}
             >
               <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
             </Pressable>
