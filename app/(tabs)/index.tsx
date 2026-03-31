@@ -23,8 +23,6 @@ import { storage } from '../../utils/storage';
 
 // Initialize Mapbox with access token
 const MAPBOX_ACCESS_TOKEN = mapboxConfig.accessToken;
-const GOOGLE_PLACES_API_KEY =
-  process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY || process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;
 if (MAPBOX_ACCESS_TOKEN) {
   // Use initializeMapbox() with the already-imported Mapbox instance
   initializeMapbox(Mapbox);
@@ -99,7 +97,7 @@ interface SearchResult {
   id: string;
   place_name: string;
   center?: [number, number] | null; // [longitude, latitude]
-  provider?: 'mapbox' | 'google';
+  provider?: 'mapbox' | 'google' | 'osm';
   place_id?: string;
 }
 
@@ -921,10 +919,10 @@ const extractHeadingDegrees = (heading: Location.LocationHeadingObject): number 
 };
 
 const DUBLIN_BBOX = {
-  minLongitude: -6.45,
-  minLatitude: 53.2,
-  maxLongitude: -6.05,
-  maxLatitude: 53.45,
+  minLongitude: -6.65,
+  minLatitude: 53.12,
+  maxLongitude: -5.9,
+  maxLatitude: 53.55,
 };
 
 const isWithinDublin = (longitude: number, latitude: number) =>
@@ -933,98 +931,325 @@ const isWithinDublin = (longitude: number, latitude: number) =>
   latitude >= DUBLIN_BBOX.minLatitude &&
   latitude <= DUBLIN_BBOX.maxLatitude;
 
-const GOOGLE_AUTOCOMPLETE_URL = 'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-const GOOGLE_PLACE_DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json';
+const OSM_PHOTON_SEARCH_URL = 'https://photon.komoot.io/api';
+const OSM_NOMINATIM_SEARCH_URL = 'https://nominatim.openstreetmap.org/search';
+const OSM_NOMINATIM_REVERSE_URL = 'https://nominatim.openstreetmap.org/reverse';
+const OSM_MAX_RESULTS = 20;
+const OSM_SEARCH_EXPAND_THRESHOLD = 12;
+const OSM_DEFAULT_COUNTRY_CODE = 'ie';
+const OSM_CONTACT_EMAIL = 'support@saferoute.app';
 
-const searchPlacesWithGoogle = async (query: string): Promise<SearchResult[]> => {
-  if (!GOOGLE_PLACES_API_KEY) {
-    return [];
-  }
+const buildQueryString = (
+  params: Record<string, string | number | boolean | null | undefined>
+): string =>
+  Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&');
 
-  const encodedQuery = encodeURIComponent(query);
-  const locationBias = `${DEFAULT_LOCATION.latitude},${DEFAULT_LOCATION.longitude}`;
-  const url =
-    `${GOOGLE_AUTOCOMPLETE_URL}?input=${encodedQuery}` +
-    `&components=country:ie&language=en&location=${locationBias}&radius=25000` +
-    `&strictbounds=true&key=${GOOGLE_PLACES_API_KEY}`;
+const dedupeLabelParts = (parts: unknown[]): string[] => {
+  const seen = new Set<string>();
+  const deduped: string[] = [];
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = await response.json();
-  const predictions = Array.isArray(data?.predictions) ? data.predictions : [];
-
-  return predictions.slice(0, 5).map((prediction: any) => ({
-    id: `google-${prediction.place_id || prediction.description}`,
-    place_name:
-      (typeof prediction.description === 'string' && prediction.description) ||
-      (typeof prediction?.structured_formatting?.main_text === 'string'
-        ? prediction.structured_formatting.main_text
-        : 'Unknown place'),
-    center: null,
-    provider: 'google',
-    place_id: prediction.place_id,
-  }));
-};
-
-const searchPlacesWithMapbox = async (query: string): Promise<SearchResult[]> => {
-  if (!MAPBOX_ACCESS_TOKEN) {
-    return [];
-  }
-
-  const encodedQuery = encodeURIComponent(query);
-  const bbox = `${DUBLIN_BBOX.minLongitude},${DUBLIN_BBOX.minLatitude},${DUBLIN_BBOX.maxLongitude},${DUBLIN_BBOX.maxLatitude}`;
-  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodedQuery}.json?access_token=${MAPBOX_ACCESS_TOKEN}&limit=5&country=ie&bbox=${bbox}&autocomplete=true`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    return [];
-  }
-
-  const data = await response.json();
-  const features = Array.isArray(data?.features) ? data.features : [];
-  const dublinFeatures = features.filter((feature: any) => {
-    if (!Array.isArray(feature.center) || feature.center.length < 2) {
-      return false;
+  parts.forEach((part) => {
+    if (typeof part !== 'string') {
+      return;
     }
-    return isWithinDublin(feature.center[0], feature.center[1]);
+    const trimmed = part.trim();
+    if (!trimmed) {
+      return;
+    }
+    const key = trimmed.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    deduped.push(trimmed);
   });
 
-  return dublinFeatures.map((feature: any) => ({
-    id: feature.id,
-    place_name: feature.place_name,
-    center: feature.center,
-    provider: 'mapbox',
-  }));
+  return deduped;
 };
 
-const fetchGooglePlaceCoordinates = async (placeId: string): Promise<[number, number] | null> => {
-  if (!GOOGLE_PLACES_API_KEY || !placeId) {
-    return null;
-  }
+const scoreOpenStreetResult = (category: unknown, type: unknown): number => {
+  const normalizedCategory = typeof category === 'string' ? category.toLowerCase() : '';
+  const normalizedType = typeof type === 'string' ? type.toLowerCase() : '';
 
-  const fields = encodeURIComponent('geometry/location,formatted_address,name');
-  const url =
-    `${GOOGLE_PLACE_DETAILS_URL}?place_id=${encodeURIComponent(placeId)}` +
-    `&fields=${fields}&key=${GOOGLE_PLACES_API_KEY}`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    return null;
-  }
-  const data = await response.json();
-  const location = data?.result?.geometry?.location;
   if (
-    typeof location?.lng !== 'number' ||
-    !Number.isFinite(location.lng) ||
-    typeof location?.lat !== 'number' ||
-    !Number.isFinite(location.lat)
+    [
+      'amenity',
+      'building',
+      'tourism',
+      'office',
+      'shop',
+      'leisure',
+      'railway',
+      'public_transport',
+      'historic',
+      'healthcare',
+      'education',
+    ].includes(normalizedCategory)
   ) {
-    return null;
+    return 0;
   }
-  return [location.lng, location.lat];
+
+  if (
+    ['university', 'college', 'school', 'hospital', 'library', 'museum'].includes(normalizedType)
+  ) {
+    return 0;
+  }
+
+  if (
+    normalizedCategory === 'highway' ||
+    ['street', 'road', 'residential', 'route', 'unclassified'].includes(normalizedType)
+  ) {
+    return 3;
+  }
+
+  if (['boundary', 'place', 'landuse'].includes(normalizedCategory)) {
+    return 2;
+  }
+
+  return 1;
+};
+
+const getNominatimSearchLabel = (item: any): string => {
+  const address = item?.address && typeof item.address === 'object' ? item.address : {};
+  const primary =
+    (typeof item?.name === 'string' && item.name) ||
+    (typeof address?.amenity === 'string' && address.amenity) ||
+    (typeof address?.building === 'string' && address.building) ||
+    (typeof address?.office === 'string' && address.office) ||
+    (typeof address?.tourism === 'string' && address.tourism) ||
+    (typeof address?.railway === 'string' && address.railway) ||
+    (typeof address?.road === 'string' && address.road) ||
+    (typeof item?.display_name === 'string' ? item.display_name.split(',')[0] : '');
+
+  const locality =
+    (typeof address?.city === 'string' && address.city) ||
+    (typeof address?.town === 'string' && address.town) ||
+    (typeof address?.village === 'string' && address.village) ||
+    (typeof address?.suburb === 'string' && address.suburb) ||
+    (typeof address?.county === 'string' && address.county) ||
+    '';
+
+  const postcode = typeof address?.postcode === 'string' ? address.postcode : '';
+  const country =
+    (typeof address?.country === 'string' && address.country) ||
+    (typeof item?.display_name === 'string' && item.display_name.includes('Ireland')
+      ? 'Ireland'
+      : '');
+
+  const parts = dedupeLabelParts([primary, locality, postcode, country]);
+  if (parts.length > 0) {
+    return parts.join(', ');
+  }
+  return typeof item?.display_name === 'string' && item.display_name.trim().length > 0
+    ? item.display_name
+    : 'Unknown place';
+};
+
+const getPhotonSearchLabel = (feature: any): string => {
+  const properties =
+    feature?.properties && typeof feature.properties === 'object' ? feature.properties : {};
+  const primary =
+    (typeof properties?.name === 'string' && properties.name) ||
+    (typeof properties?.street === 'string' && properties.street) ||
+    (typeof properties?.city === 'string' && properties.city) ||
+    '';
+  const street = typeof properties?.street === 'string' ? properties.street : '';
+  const locality =
+    (typeof properties?.city === 'string' && properties.city) ||
+    (typeof properties?.county === 'string' && properties.county) ||
+    (typeof properties?.district === 'string' && properties.district) ||
+    '';
+  const postcode = typeof properties?.postcode === 'string' ? properties.postcode : '';
+  const country = typeof properties?.country === 'string' ? properties.country : '';
+
+  const parts = dedupeLabelParts([primary, street, locality, postcode, country]);
+  if (parts.length > 0) {
+    return parts.join(', ');
+  }
+  return 'Unknown place';
+};
+
+type RankedSearchResult = {
+  rank: number;
+  order: number;
+  result: SearchResult;
+};
+
+const searchPlacesWithOpenStreet = async (query: string): Promise<SearchResult[]> => {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) {
+    return [];
+  }
+
+  const viewbox = `${DUBLIN_BBOX.minLongitude},${DUBLIN_BBOX.maxLatitude},${DUBLIN_BBOX.maxLongitude},${DUBLIN_BBOX.minLatitude}`;
+  const resultsById = new Map<string, RankedSearchResult>();
+  let insertionOrder = 0;
+
+  const addRankedResult = (candidate: SearchResult, rank: number) => {
+    if (!candidate.id || !candidate.center || candidate.center.length < 2) {
+      return;
+    }
+    if (!isWithinDublin(candidate.center[0], candidate.center[1])) {
+      return;
+    }
+
+    const existing = resultsById.get(candidate.id);
+    if (!existing || rank < existing.rank) {
+      resultsById.set(candidate.id, {
+        rank,
+        order: insertionOrder,
+        result: candidate,
+      });
+      insertionOrder += 1;
+    }
+  };
+
+  try {
+    const photonUrl = `${OSM_PHOTON_SEARCH_URL}?${buildQueryString({
+      q: normalizedQuery,
+      lat: DEFAULT_LOCATION.latitude,
+      lon: DEFAULT_LOCATION.longitude,
+      lang: 'en',
+      limit: 12,
+    })}`;
+    const response = await fetch(photonUrl);
+    if (response.ok) {
+      const data = await response.json();
+      const features = Array.isArray(data?.features) ? data.features : [];
+      features.forEach((feature: any, index: number) => {
+        const coordinates = feature?.geometry?.coordinates;
+        if (!Array.isArray(coordinates) || coordinates.length < 2) {
+          return;
+        }
+        const [longitude, latitude] = coordinates;
+        if (
+          typeof longitude !== 'number' ||
+          !Number.isFinite(longitude) ||
+          typeof latitude !== 'number' ||
+          !Number.isFinite(latitude)
+        ) {
+          return;
+        }
+
+        const properties =
+          feature?.properties && typeof feature.properties === 'object' ? feature.properties : {};
+        const osmType =
+          typeof properties?.osm_type === 'string' && properties.osm_type
+            ? properties.osm_type
+            : 'unknown';
+        const osmId =
+          (typeof properties?.osm_id === 'number' && String(properties.osm_id)) ||
+          (typeof properties?.osm_id === 'string' && properties.osm_id) ||
+          null;
+        const fallbackId = `${longitude.toFixed(6)}-${latitude.toFixed(6)}-${index}`;
+        const id = `osm-photon-${osmType}-${osmId || fallbackId}`;
+        const label = getPhotonSearchLabel(feature);
+        const rank = scoreOpenStreetResult(properties?.osm_key, properties?.type);
+
+        addRankedResult(
+          {
+            id,
+            place_name: label,
+            center: [longitude, latitude],
+            provider: 'osm',
+            place_id: osmId ? `${osmType}:${osmId}` : undefined,
+          },
+          rank
+        );
+      });
+    }
+  } catch {
+    // Ignore photon failures; Nominatim fallback below.
+  }
+
+  if (resultsById.size < OSM_SEARCH_EXPAND_THRESHOLD) {
+    const lowercaseQuery = normalizedQuery.toLowerCase();
+    const nominatimQueries = lowercaseQuery.includes('dublin')
+      ? [normalizedQuery]
+      : [normalizedQuery, `${normalizedQuery} Dublin`];
+
+    const nominatimResponses = await Promise.all(
+      nominatimQueries.map(async (textQuery) => {
+        const url = `${OSM_NOMINATIM_SEARCH_URL}?${buildQueryString({
+          q: textQuery,
+          format: 'jsonv2',
+          addressdetails: 1,
+          limit: 12,
+          countrycodes: OSM_DEFAULT_COUNTRY_CODE,
+          bounded: 1,
+          viewbox,
+          'accept-language': 'en',
+          email: OSM_CONTACT_EMAIL,
+        })}`;
+
+        try {
+          const response = await fetch(url);
+          if (!response.ok) {
+            return [] as any[];
+          }
+          const data = await response.json();
+          return Array.isArray(data) ? data : [];
+        } catch {
+          return [] as any[];
+        }
+      })
+    );
+
+    nominatimResponses.forEach((items) => {
+      items.forEach((item: any, index: number) => {
+        const longitude = Number.parseFloat(String(item?.lon));
+        const latitude = Number.parseFloat(String(item?.lat));
+        if (
+          !Number.isFinite(longitude) ||
+          !Number.isFinite(latitude) ||
+          !isWithinDublin(longitude, latitude)
+        ) {
+          return;
+        }
+
+        const placeId =
+          (typeof item?.place_id === 'number' && String(item.place_id)) ||
+          (typeof item?.place_id === 'string' && item.place_id) ||
+          null;
+        const id = `osm-nominatim-${placeId || `${longitude.toFixed(6)}-${latitude.toFixed(6)}-${index}`}`;
+        const label = getNominatimSearchLabel(item);
+        const rank = scoreOpenStreetResult(item?.category, item?.type);
+        addRankedResult(
+          {
+            id,
+            place_name: label,
+            center: [longitude, latitude],
+            provider: 'osm',
+            place_id: placeId || undefined,
+          },
+          rank
+        );
+      });
+    });
+  }
+
+  const normalizedQueryLower = normalizedQuery.toLowerCase();
+  return Array.from(resultsById.values())
+    .sort((a, b) => {
+      if (a.rank !== b.rank) {
+        return a.rank - b.rank;
+      }
+      const aMatchesQuery = a.result.place_name.toLowerCase().includes(normalizedQueryLower)
+        ? 0
+        : 1;
+      const bMatchesQuery = b.result.place_name.toLowerCase().includes(normalizedQueryLower)
+        ? 0
+        : 1;
+      if (aMatchesQuery !== bMatchesQuery) {
+        return aMatchesQuery - bMatchesQuery;
+      }
+      return a.order - b.order;
+    })
+    .slice(0, OSM_MAX_RESULTS)
+    .map((item) => item.result);
 };
 
 const resolveSearchResultCoordinates = async (
@@ -1039,27 +1264,25 @@ const resolveSearchResultCoordinates = async (
     return [result.center[0], result.center[1]];
   }
 
-  if (result.provider === 'google' && result.place_id) {
-    return fetchGooglePlaceCoordinates(result.place_id);
-  }
-
   return null;
 };
 
 const formatCoordinateLabel = (coordinate: [number, number]): string =>
   `${coordinate[1].toFixed(5)}, ${coordinate[0].toFixed(5)}`;
 
-const fetchMapboxPlaceNameForCoordinate = async (
+const fetchOpenStreetPlaceNameForCoordinate = async (
   coordinate: [number, number]
 ): Promise<string | null> => {
-  if (!MAPBOX_ACCESS_TOKEN) {
-    return null;
-  }
-
   const [longitude, latitude] = coordinate;
-  const url =
-    `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json` +
-    `?access_token=${MAPBOX_ACCESS_TOKEN}&limit=1&language=en`;
+  const url = `${OSM_NOMINATIM_REVERSE_URL}?${buildQueryString({
+    format: 'jsonv2',
+    lat: latitude,
+    lon: longitude,
+    zoom: 18,
+    addressdetails: 1,
+    'accept-language': 'en',
+    email: OSM_CONTACT_EMAIL,
+  })}`;
 
   try {
     const response = await fetch(url);
@@ -1068,17 +1291,36 @@ const fetchMapboxPlaceNameForCoordinate = async (
     }
 
     const data = await response.json();
-    const firstFeature = Array.isArray(data?.features) ? data.features[0] : null;
-    if (!firstFeature) {
-      return null;
+    const address = data?.address && typeof data.address === 'object' ? data.address : {};
+
+    const primary =
+      (typeof data?.name === 'string' && data.name) ||
+      (typeof address?.amenity === 'string' && address.amenity) ||
+      (typeof address?.building === 'string' && address.building) ||
+      (typeof address?.office === 'string' && address.office) ||
+      (typeof address?.tourism === 'string' && address.tourism) ||
+      (typeof address?.railway === 'string' && address.railway) ||
+      (typeof address?.road === 'string' && address.road) ||
+      '';
+
+    const locality =
+      (typeof address?.city === 'string' && address.city) ||
+      (typeof address?.town === 'string' && address.town) ||
+      (typeof address?.village === 'string' && address.village) ||
+      (typeof address?.suburb === 'string' && address.suburb) ||
+      (typeof address?.county === 'string' && address.county) ||
+      '';
+
+    const postcode = typeof address?.postcode === 'string' ? address.postcode : '';
+    const country = typeof address?.country === 'string' ? address.country : '';
+
+    const parts = dedupeLabelParts([primary, locality, postcode, country]);
+    if (parts.length > 0) {
+      return parts.join(', ');
     }
 
-    if (typeof firstFeature.place_name === 'string' && firstFeature.place_name.trim().length > 0) {
-      return firstFeature.place_name;
-    }
-
-    if (typeof firstFeature.text === 'string' && firstFeature.text.trim().length > 0) {
-      return firstFeature.text;
+    if (typeof data?.display_name === 'string' && data.display_name.trim().length > 0) {
+      return data.display_name;
     }
   } catch {
     return null;
@@ -1995,7 +2237,7 @@ const Index = () => {
     const lookupId = mapSelectionLookupRef.current + 1;
     mapSelectionLookupRef.current = lookupId;
 
-    fetchMapboxPlaceNameForCoordinate(coordinate)
+    fetchOpenStreetPlaceNameForCoordinate(coordinate)
       .then((resolvedLabel) => {
         if (mapSelectionLookupRef.current !== lookupId || !resolvedLabel) {
           return;
@@ -2312,16 +2554,8 @@ const Index = () => {
 
     try {
       setIsSearching(true);
-      if (GOOGLE_PLACES_API_KEY) {
-        const googleResults = await searchPlacesWithGoogle(query);
-        if (googleResults.length > 0) {
-          setSearchResults(googleResults);
-          return;
-        }
-      }
-
-      const mapboxResults = await searchPlacesWithMapbox(query);
-      setSearchResults(mapboxResults);
+      const results = await searchPlacesWithOpenStreet(query);
+      setSearchResults(results);
     } catch {
       setSearchResults([]);
     } finally {
@@ -2380,6 +2614,107 @@ const Index = () => {
       setRouteData(null);
       setSelectedRouteSegment(null);
       setTransitItinerary(null);
+
+      const fetchAndSetWalkingRoute = async () => {
+        const payload = USE_V1_ROUTE_API
+          ? {
+              origin: {
+                lat: startCoord[1],
+                lon: startCoord[0],
+              },
+              destination: {
+                lat: endCoord[1],
+                lon: endCoord[0],
+              },
+              user_id: user?.sub || 'anonymous-user',
+              preferences: {
+                optimize_for: 'balanced',
+                transport_mode: 'walking',
+              },
+            }
+          : {
+              start: {
+                lat: startCoord[1],
+                lng: startCoord[0],
+              },
+              end: {
+                lat: endCoord[1],
+                lng: endCoord[0],
+              },
+            };
+
+        console.log('Routing via URL:', ROUTE_API_URL);
+        const response = await fetch(ROUTE_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text().catch(() => response.statusText);
+          let errorDetail = errorText;
+          try {
+            const errJson = JSON.parse(errorText);
+            if (errJson.detail) {
+              errorDetail = errJson.detail;
+            }
+          } catch {
+            // Keep plain-text error.
+          }
+          throw new Error(`${errorDetail || response.statusText}`);
+        }
+
+        const data = await response.json();
+
+        if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
+          setRouteData(withTransportModeInRouteData(data, 'walking'));
+          return;
+        }
+
+        if (Array.isArray(data?.routes) && data.routes.length > 0) {
+          const primaryRoute = data.routes.find((route: any) => route.is_primary) || data.routes[0];
+          const geometryCoordinates = extractCoordinatesFromRouteGeometry(primaryRoute?.geometry);
+          const waypoints = Array.isArray(primaryRoute?.waypoints) ? primaryRoute.waypoints : [];
+          const waypointCoordinates = waypoints
+            .filter((wp: any) => typeof wp?.lon === 'number' && typeof wp?.lat === 'number')
+            .map((wp: any) => [wp.lon, wp.lat]);
+          const shouldFallbackToMapbox = geometryCoordinates.length < 2;
+          const mapboxRoute = shouldFallbackToMapbox
+            ? await fetchMapboxDirectionsRoute(startCoord, endCoord)
+            : null;
+          let coordinates = geometryCoordinates;
+          if (coordinates.length < 2) {
+            if (Array.isArray(mapboxRoute?.coordinates) && mapboxRoute.coordinates.length >= 2) {
+              coordinates = mapboxRoute.coordinates;
+            } else {
+              coordinates = waypointCoordinates;
+            }
+          }
+
+          if (coordinates.length < 2) {
+            throw new Error('Route response does not include enough waypoint coordinates');
+          }
+
+          setRouteData(
+            withTransportModeInRouteData(
+              createRouteFeatureCollection(coordinates, {
+                route_id: data.route_id || '',
+                distance_m: primaryRoute.distance_m ?? mapboxRoute?.distanceMeters,
+                duration_s: primaryRoute.duration_s ?? mapboxRoute?.durationSeconds,
+                safety_score: primaryRoute.safety_score,
+                source: 'saferoute_algorithm',
+                transport_mode: 'walking',
+              }),
+              'walking'
+            )
+          );
+          return;
+        }
+
+        throw new Error('Unexpected route response format');
+      };
 
       if (transportMode === 'public_transit') {
         const transitPayload = {
@@ -2456,11 +2791,22 @@ const Index = () => {
           }
         };
 
-        const transitData = await requestTransitWithFallback(TRANSIT_API_CANDIDATES);
+        let transitData: TransitPlanResponse;
+        try {
+          transitData = await requestTransitWithFallback(TRANSIT_API_CANDIDATES);
+        } catch {
+          await fetchAndSetWalkingRoute();
+          setRouteError('Public transit is unavailable right now. Showing walking route instead.');
+          return;
+        }
 
         const primaryItinerary = transitData.itineraries?.[0];
         if (!primaryItinerary) {
-          throw new Error('No public transit itinerary found for this destination');
+          await fetchAndSetWalkingRoute();
+          setRouteError(
+            'No public transit itinerary found for this destination. Showing walking route.'
+          );
+          return;
         }
 
         setTransitItinerary(primaryItinerary);
@@ -2482,103 +2828,13 @@ const Index = () => {
                 'public_transit'
               )
             );
+          } else {
+            await fetchAndSetWalkingRoute();
+            setRouteError('Transit geometry unavailable. Showing walking route.');
           }
         }
       } else {
-        const payload = USE_V1_ROUTE_API
-          ? {
-              origin: {
-                lat: startCoord[1],
-                lon: startCoord[0],
-              },
-              destination: {
-                lat: endCoord[1],
-                lon: endCoord[0],
-              },
-              user_id: user?.sub || 'anonymous-user',
-              preferences: {
-                optimize_for: 'balanced',
-                transport_mode: 'walking',
-              },
-            }
-          : {
-              start: {
-                lat: startCoord[1],
-                lng: startCoord[0],
-              },
-              end: {
-                lat: endCoord[1],
-                lng: endCoord[0],
-              },
-            };
-
-        console.log('Routing via URL:', ROUTE_API_URL);
-        const response = await fetch(ROUTE_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => response.statusText);
-          let errorDetail = errorText;
-          try {
-            const errJson = JSON.parse(errorText);
-            if (errJson.detail) {
-              errorDetail = errJson.detail;
-            }
-          } catch {
-            // Keep plain-text error.
-          }
-          throw new Error(`${errorDetail || response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
-          setRouteData(withTransportModeInRouteData(data, 'walking'));
-        } else if (Array.isArray(data?.routes) && data.routes.length > 0) {
-          const primaryRoute = data.routes.find((route: any) => route.is_primary) || data.routes[0];
-          const geometryCoordinates = extractCoordinatesFromRouteGeometry(primaryRoute?.geometry);
-          const waypoints = Array.isArray(primaryRoute?.waypoints) ? primaryRoute.waypoints : [];
-          const waypointCoordinates = waypoints
-            .filter((wp: any) => typeof wp?.lon === 'number' && typeof wp?.lat === 'number')
-            .map((wp: any) => [wp.lon, wp.lat]);
-          const shouldFallbackToMapbox = geometryCoordinates.length < 2;
-          const mapboxRoute = shouldFallbackToMapbox
-            ? await fetchMapboxDirectionsRoute(startCoord, endCoord)
-            : null;
-          let coordinates = geometryCoordinates;
-          if (coordinates.length < 2) {
-            if (Array.isArray(mapboxRoute?.coordinates) && mapboxRoute.coordinates.length >= 2) {
-              coordinates = mapboxRoute.coordinates;
-            } else {
-              coordinates = waypointCoordinates;
-            }
-          }
-
-          if (coordinates.length < 2) {
-            throw new Error('Route response does not include enough waypoint coordinates');
-          }
-
-          setRouteData(
-            withTransportModeInRouteData(
-              createRouteFeatureCollection(coordinates, {
-                route_id: data.route_id || '',
-                distance_m: primaryRoute.distance_m ?? mapboxRoute?.distanceMeters,
-                duration_s: primaryRoute.duration_s ?? mapboxRoute?.durationSeconds,
-                safety_score: primaryRoute.safety_score,
-                source: 'saferoute_algorithm',
-                transport_mode: 'walking',
-              }),
-              'walking'
-            )
-          );
-        } else {
-          throw new Error('Unexpected route response format');
-        }
+        await fetchAndSetWalkingRoute();
       }
 
       if (cameraRef.current) {
@@ -2592,7 +2848,7 @@ const Index = () => {
         });
       }
     } catch (error) {
-      console.error('Route API error:', error);
+      console.warn('Route API warning:', error);
       setRouteError(error instanceof Error ? error.message : 'Failed to calculate route');
     } finally {
       setIsLoadingRoute(false);
@@ -2639,7 +2895,7 @@ const Index = () => {
       id: `map-point-${coordinate[0].toFixed(5)}-${coordinate[1].toFixed(5)}`,
       place_name: label,
       center: coordinate,
-      provider: 'mapbox',
+      provider: 'osm',
     };
 
     setRouteEnd(coordinate);
