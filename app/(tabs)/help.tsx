@@ -1,9 +1,11 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
+  Alert,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,9 +13,14 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Recaptcha, { RecaptchaRef } from 'react-native-recaptcha-that-works';
 import GradientBackground from '../../components/ui/GradientBackground';
+import { API_URL } from '../../config/api';
 import { InputFocus, InputFocusType } from '../../constants/routes';
 import { colors } from '../../constants/theme';
+
+// TODO: Replace with your actual reCAPTCHA v2 site key from https://www.google.com/recaptcha/admin
+const RECAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY!;
 
 interface IHelpMenuItem {
   icon: keyof typeof Ionicons.glyphMap;
@@ -173,6 +180,43 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.textPrimary,
   },
+  // Checkbox styles
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  checkboxIcon: {
+    marginRight: 10,
+  },
+  checkboxText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  checkboxLink: {
+    color: colors.accent,
+    textDecorationLine: 'underline',
+  },
+  // reCAPTCHA status
+  recaptchaStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: colors.background,
+    borderRadius: 8,
+  },
+  recaptchaStatusText: {
+    fontSize: 13,
+    color: colors.textMuted,
+    marginLeft: 8,
+  },
+  recaptchaVerifiedText: {
+    color: colors.accent,
+  },
 });
 
 const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
@@ -198,35 +242,88 @@ const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
 
 const Help = () => {
   const router = useRouter();
-  const [showHelpModal, setShowHelpModal] = useState(false);
+  const recaptchaRef = useRef<RecaptchaRef>(null);
+  // const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
-  const [helpQuery, setHelpQuery] = useState('');
+  // const [helpQuery, setHelpQuery] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [inputFocused, setInputFocused] = useState<InputFocusType>(null);
+  const [privacyAccepted, setPrivacyAccepted] = useState(false);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
 
   const handleOpenTerms = () => {
-    Linking.openURL('https://saferoute.app/terms');
+    Linking.openURL(`${API_URL}/terms`);
   };
 
   const handleAppInfo = () => {
     // TODO: Show app info modal
   };
 
-  const handleSubmitHelp = () => {
-    if (helpQuery.trim()) {
-      // TODO: Submit help query to backend
-      setHelpQuery('');
-      setShowHelpModal(false);
-    }
-  };
+  // const handleSubmitHelp = () => {
+  //   if (helpQuery.trim()) {
+  //     // TODO: Submit help query to backend
+  //     setHelpQuery('');
+  //     setShowHelpModal(false);
+  //   }
+  // };
 
-  const handleSubmitFeedback = () => {
-    if (feedbackText.trim()) {
-      // TODO: Submit feedback to backend
+  const handleSubmitFeedback = async () => {
+    if (!feedbackText.trim() || !privacyAccepted || !recaptchaToken) return;
+
+    try {
+      // const response = await fetch('http://10.0.2.2:20004/v1/system-feedback/submit', {
+      const response = await fetch(`${API_URL}/v1/system-feedback/submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: feedbackText.trim(),
+          privacy_accepted: privacyAccepted,
+          captcha_token: recaptchaToken,
+          subject: 'App Feedback',
+          user_agent: `${Platform.OS} ${Platform.Version}`,
+        }),
+      });
+
+      if (response.ok) {
+        Alert.alert('Thank you!', 'Your feedback has been submitted successfully.');
+      } else {
+        const errorData = await response.json().catch(() => null);
+        let errorMessage = 'Failed to submit feedback. Please try again.';
+        if (errorData?.detail) {
+          errorMessage =
+            typeof errorData.detail === 'string'
+              ? errorData.detail
+              : JSON.stringify(errorData.detail);
+        }
+        console.log('Feedback submission error:', response.status, errorData);
+        Alert.alert('Submission Failed', errorMessage);
+      }
+    } catch {
+      Alert.alert('Network Error', 'Could not connect to the server. Please try again later.');
+    } finally {
       setFeedbackText('');
+      setPrivacyAccepted(false);
+      setRecaptchaToken(null);
       setShowFeedbackModal(false);
     }
   };
+
+  const handleCloseFeedbackModal = () => {
+    setFeedbackText('');
+    setPrivacyAccepted(false);
+    setRecaptchaToken(null);
+    setShowFeedbackModal(false);
+  };
+
+  const handleRecaptchaVerify = (token: string) => {
+    setRecaptchaToken(token);
+  };
+
+  const handleRecaptchaExpire = () => {
+    setRecaptchaToken(null);
+  };
+
+  const isSubmitEnabled = feedbackText.trim().length > 0 && privacyAccepted && !!recaptchaToken;
 
   return (
     <GradientBackground>
@@ -239,7 +336,7 @@ const Help = () => {
           <View style={styles.header}>
             <Pressable
               style={({ pressed }) => [styles.headerButton, pressed && styles.headerButtonPressed]}
-              onPress={() => router.back()}
+              onPress={() => router.navigate('/(tabs)/profile')}
             >
               <Ionicons name="chevron-back" size={24} color={colors.textPrimary} />
             </Pressable>
@@ -249,13 +346,13 @@ const Help = () => {
           {/* Help Menu */}
           <View style={styles.section}>
             <View style={styles.card}>
-              <HelpMenuItem
+              {/* <HelpMenuItem
                 icon="help-circle-outline"
                 title="Help center"
                 subtitle="Get help with using SafeRoute"
                 onPress={() => setShowHelpModal(true)}
               />
-              <View style={styles.cardDivider} />
+              <View style={styles.cardDivider} /> */}
               <HelpMenuItem
                 icon="chatbubble-outline"
                 title="Send feedback"
@@ -281,7 +378,7 @@ const Help = () => {
         </ScrollView>
 
         {/* Help Center Modal */}
-        <Modal
+        {/* <Modal
           visible={showHelpModal}
           transparent
           animationType="fade"
@@ -321,23 +418,20 @@ const Help = () => {
               </Pressable>
             </Pressable>
           </Pressable>
-        </Modal>
+        </Modal> */}
 
         {/* Feedback Modal */}
         <Modal
           visible={showFeedbackModal}
           transparent
           animationType="fade"
-          onRequestClose={() => setShowFeedbackModal(false)}
+          onRequestClose={handleCloseFeedbackModal}
         >
-          <Pressable style={styles.modalOverlay} onPress={() => setShowFeedbackModal(false)}>
+          <Pressable style={styles.modalOverlay} onPress={handleCloseFeedbackModal}>
             <Pressable style={styles.modalContent} onPress={(e) => e.stopPropagation()}>
               <View style={styles.modalHeader}>
                 <Text style={styles.modalTitle}>Send Feedback</Text>
-                <Pressable
-                  style={styles.modalCloseButton}
-                  onPress={() => setShowFeedbackModal(false)}
-                >
+                <Pressable style={styles.modalCloseButton} onPress={handleCloseFeedbackModal}>
                   <Ionicons name="close" size={20} color={colors.textPrimary} />
                 </Pressable>
               </View>
@@ -355,19 +449,83 @@ const Help = () => {
                 onFocus={() => setInputFocused(InputFocus.FEEDBACK)}
                 onBlur={() => setInputFocused(null)}
               />
+
+              {/* Privacy Policy Checkbox */}
+              <Pressable
+                style={styles.checkboxRow}
+                onPress={() => setPrivacyAccepted(!privacyAccepted)}
+              >
+                <Ionicons
+                  name={privacyAccepted ? 'checkbox' : 'square-outline'}
+                  size={22}
+                  color={privacyAccepted ? colors.accent : colors.textMuted}
+                  style={styles.checkboxIcon}
+                />
+                <Text style={styles.checkboxText}>
+                  I read and accept the{' '}
+                  <Text
+                    style={styles.checkboxLink}
+                    onPress={() => Linking.openURL(`${API_URL}/terms`)}
+                  >
+                    privacy policy
+                  </Text>
+                </Text>
+              </Pressable>
+
+              {/* reCAPTCHA Status */}
+              <View style={styles.recaptchaStatus}>
+                <Ionicons
+                  name={recaptchaToken ? 'shield-checkmark' : 'shield-outline'}
+                  size={18}
+                  color={recaptchaToken ? colors.accent : colors.textMuted}
+                />
+                <Text
+                  style={[
+                    styles.recaptchaStatusText,
+                    recaptchaToken && styles.recaptchaVerifiedText,
+                  ]}
+                >
+                  {recaptchaToken ? 'reCAPTCHA verified' : 'reCAPTCHA verification required'}
+                </Text>
+              </View>
+
               <Pressable
                 style={[
                   styles.modalSubmitButton,
-                  !feedbackText.trim() && styles.modalSubmitButtonDisabled,
+                  !isSubmitEnabled && styles.modalSubmitButtonDisabled,
                 ]}
-                onPress={handleSubmitFeedback}
-                disabled={!feedbackText.trim()}
+                onPress={() => {
+                  if (!recaptchaToken) {
+                    recaptchaRef.current?.open();
+                  } else {
+                    handleSubmitFeedback();
+                  }
+                }}
+                disabled={!feedbackText.trim() || !privacyAccepted}
               >
-                <Text style={styles.modalSubmitText}>Submit</Text>
+                <Text style={styles.modalSubmitText}>
+                  {!recaptchaToken && feedbackText.trim() && privacyAccepted
+                    ? 'Verify & Submit'
+                    : 'Submit'}
+                </Text>
               </Pressable>
             </Pressable>
           </Pressable>
         </Modal>
+
+        {/* reCAPTCHA WebView (invisible, renders off-screen until triggered) */}
+        <Recaptcha
+          ref={recaptchaRef}
+          siteKey={RECAPTCHA_SITE_KEY}
+          baseUrl={API_URL}
+          onVerify={handleRecaptchaVerify}
+          onExpire={handleRecaptchaExpire}
+          onError={(err) => {
+            console.error('reCAPTCHA error:', err);
+            Alert.alert('reCAPTCHA Error', 'Verification failed. Please try again.');
+          }}
+          size="invisible"
+        />
       </View>
     </GradientBackground>
   );

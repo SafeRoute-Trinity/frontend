@@ -15,6 +15,7 @@ const ACCESS_TOKEN_KEY = 'auth0_access_token';
 const API_BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl ||
   coreEndpoints.backendBaseUrl ||
+  process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:20000';
 
 /**
