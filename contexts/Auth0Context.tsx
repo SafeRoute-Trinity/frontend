@@ -72,7 +72,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
           client_id: auth0Config.clientId,
           scope: 'openid profile email offline_access',
           realm: 'Username-Password-Authentication', // Specify database connection
-          audience: 'https://saferouteapp.eu.auth0.com/api/v2/', // Add audience to get JWT tokens
+          audience: `https://${auth0Config.domain}/api/v2/`, // Add audience to get JWT tokens
         }),
       });
 
