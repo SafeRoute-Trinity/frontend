@@ -13,11 +13,23 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import Recaptcha, { RecaptchaRef } from 'react-native-recaptcha-that-works';
 import GradientBackground from '../../components/ui/GradientBackground';
 import { API_URL } from '../../config/api';
 import { InputFocus, InputFocusType } from '../../constants/routes';
 import { colors } from '../../constants/theme';
+
+type RecaptchaRef = { open: () => void };
+
+const recaptchaModule: { default?: any } | null = (() => {
+  try {
+    return require('react-native-recaptcha-that-works');
+  } catch {
+    return null;
+  }
+})();
+
+const RecaptchaView = recaptchaModule?.default ?? null;
+const IS_RECAPTCHA_AVAILABLE = Boolean(RecaptchaView);
 
 // TODO: Replace with your actual reCAPTCHA v2 site key from https://www.google.com/recaptcha/admin
 const RECAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY!;
@@ -242,14 +254,16 @@ const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
 
 const Help = () => {
   const router = useRouter();
-  const recaptchaRef = useRef<RecaptchaRef>(null);
+  const recaptchaRef = useRef<RecaptchaRef | null>(null);
   // const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   // const [helpQuery, setHelpQuery] = useState('');
   const [feedbackText, setFeedbackText] = useState('');
   const [inputFocused, setInputFocused] = useState<InputFocusType>(null);
   const [privacyAccepted, setPrivacyAccepted] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(null);
+  const [recaptchaToken, setRecaptchaToken] = useState<string | null>(
+    IS_RECAPTCHA_AVAILABLE ? null : 'dev-bypass-token'
+  );
 
   const handleOpenTerms = () => {
     Linking.openURL(`${API_URL}/terms`);
@@ -311,7 +325,7 @@ const Help = () => {
   const handleCloseFeedbackModal = () => {
     setFeedbackText('');
     setPrivacyAccepted(false);
-    setRecaptchaToken(null);
+    setRecaptchaToken(IS_RECAPTCHA_AVAILABLE ? null : 'dev-bypass-token');
     setShowFeedbackModal(false);
   };
 
@@ -485,7 +499,11 @@ const Help = () => {
                     recaptchaToken && styles.recaptchaVerifiedText,
                   ]}
                 >
-                  {recaptchaToken ? 'reCAPTCHA verified' : 'reCAPTCHA verification required'}
+                  {!IS_RECAPTCHA_AVAILABLE
+                    ? 'reCAPTCHA unavailable in this build'
+                    : recaptchaToken
+                      ? 'reCAPTCHA verified'
+                      : 'reCAPTCHA verification required'}
                 </Text>
               </View>
 
@@ -495,7 +513,7 @@ const Help = () => {
                   !isSubmitEnabled && styles.modalSubmitButtonDisabled,
                 ]}
                 onPress={() => {
-                  if (!recaptchaToken) {
+                  if (!recaptchaToken && IS_RECAPTCHA_AVAILABLE) {
                     recaptchaRef.current?.open();
                   } else {
                     handleSubmitFeedback();
@@ -504,7 +522,7 @@ const Help = () => {
                 disabled={!feedbackText.trim() || !privacyAccepted}
               >
                 <Text style={styles.modalSubmitText}>
-                  {!recaptchaToken && feedbackText.trim() && privacyAccepted
+                  {!recaptchaToken && feedbackText.trim() && privacyAccepted && IS_RECAPTCHA_AVAILABLE
                     ? 'Verify & Submit'
                     : 'Submit'}
                 </Text>
@@ -514,18 +532,20 @@ const Help = () => {
         </Modal>
 
         {/* reCAPTCHA WebView (invisible, renders off-screen until triggered) */}
-        <Recaptcha
-          ref={recaptchaRef}
-          siteKey={RECAPTCHA_SITE_KEY}
-          baseUrl={API_URL}
-          onVerify={handleRecaptchaVerify}
-          onExpire={handleRecaptchaExpire}
-          onError={(err) => {
-            console.error('reCAPTCHA error:', err);
-            Alert.alert('reCAPTCHA Error', 'Verification failed. Please try again.');
-          }}
-          size="invisible"
-        />
+        {RecaptchaView ? (
+          <RecaptchaView
+            ref={recaptchaRef}
+            siteKey={RECAPTCHA_SITE_KEY}
+            baseUrl={API_URL}
+            onVerify={handleRecaptchaVerify}
+            onExpire={handleRecaptchaExpire}
+            onError={(err: unknown) => {
+              console.error('reCAPTCHA error:', err);
+              Alert.alert('reCAPTCHA Error', 'Verification failed. Please try again.');
+            }}
+            size="invisible"
+          />
+        ) : null}
       </View>
     </GradientBackground>
   );
