@@ -7,13 +7,15 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { coreEndpoints } from '../config/core-endpoints';
 
 const ACCESS_TOKEN_KEY = 'auth0_access_token';
 
 // Get API base URL from environment or use default
 const API_BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl ||
-  process.env.EXPO_PUBLIC_API_BASE_URL ||
+  coreEndpoints.backendBaseUrl ||
+  process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:20000';
 
 /**
@@ -39,8 +41,8 @@ const getAccessToken = async (): Promise<string | null> => {
   }
   try {
     return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-  } catch (error) {
-    // console.error('Error retrieving access token:', error);
+  } catch {
+    // Ignore storage read failures and continue unauthenticated.
     return null;
   }
 };
@@ -73,23 +75,16 @@ export const apiRequest = async (
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new ApiError(`API request failed with status ${response.status}`, response.status);
-    }
-
-    return response;
-  } catch (error) {
-    // Log unexpected errors with context before rethrowing
-    // console.error(`Request to ${url} failed:`, error);
-    throw error;
+  if (!response.ok) {
+    throw new ApiError(`API request failed with status ${response.status}`, response.status);
   }
+
+  return response;
 };
 
 /**

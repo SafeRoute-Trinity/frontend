@@ -1,6 +1,5 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode } from 'react';
-import { StyleSheet } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { colors } from '../../constants/theme';
 
 interface IGradientBackground {
@@ -8,19 +7,28 @@ interface IGradientBackground {
 }
 
 const styles = StyleSheet.create({
-  gradient: {
+  container: {
     flex: 1,
+    backgroundColor: colors.gradientMiddle,
+  },
+  overlayTop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.gradientStart,
+    opacity: 0.42,
+  },
+  overlayBottom: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.gradientEnd,
+    opacity: 0.38,
   },
 });
 
 const GradientBackground = ({ children }: IGradientBackground) => (
-  <LinearGradient
-    colors={[colors.gradientStart, colors.gradientMiddle, colors.gradientEnd]}
-    locations={[0, 0.5, 1]}
-    style={styles.gradient}
-  >
+  <View style={styles.container}>
+    <View pointerEvents="none" style={styles.overlayTop} />
+    <View pointerEvents="none" style={styles.overlayBottom} />
     {children}
-  </LinearGradient>
+  </View>
 );
 
 export default GradientBackground;
