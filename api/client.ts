@@ -45,21 +45,6 @@ export const apiClient = {
       }
     }
 
-    const method = options.method || 'GET';
-    const headersObj: Record<string, string> = {};
-    headers.forEach((value, key) => {
-      headersObj[key] = value;
-    });
-
-    console.log(`🌐 [API] ${method} ${url}`, {
-      headers: {
-        ...headersObj,
-        Authorization: headersObj.authorization
-          ? `Bearer ${headersObj.authorization.substring(7, 15)}...`
-          : 'MISSING',
-      },
-    });
-
     const response = await fetch(url, {
       ...options,
       headers,

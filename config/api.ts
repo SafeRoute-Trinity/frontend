@@ -20,8 +20,15 @@ const getApiUrl = () => {
 
 export const API_URL = getApiUrl();
 
-// SOS service (separate microservice, no gateway proxy yet)
+// SOS service – in production the ingress routes /v1/emergency/* to the SOS
+// service, so we use the same base URL. Locally, it runs on a separate port.
 const getSosApiUrl = () => {
+  if (process.env.EXPO_PUBLIC_SOS_API_URL) {
+    return process.env.EXPO_PUBLIC_SOS_API_URL;
+  }
+  if (coreEndpoints.backendBaseUrl) {
+    return coreEndpoints.backendBaseUrl;
+  }
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }

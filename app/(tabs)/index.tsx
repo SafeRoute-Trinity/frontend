@@ -1,7 +1,7 @@
 import Mapbox, { Camera, LineLayer, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -893,6 +893,9 @@ const styles = StyleSheet.create({
   mapPointEndButton: {
     backgroundColor: '#DC2626',
   },
+  mapPointReportButton: {
+    backgroundColor: '#2563EB',
+  },
   mapPointCancelButton: {
     backgroundColor: '#1E293B',
     marginBottom: 0,
@@ -902,7 +905,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
   },
-  // Modal styles (used for map long-press report)
+  // Modal styles (used for reporting unsafe locations)
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -1051,6 +1054,8 @@ const OSM_MAX_RESULTS = 20;
 const OSM_SEARCH_EXPAND_THRESHOLD = 12;
 const OSM_DEFAULT_COUNTRY_CODE = 'ie';
 const OSM_CONTACT_EMAIL = 'support@saferoute.app';
+const SEARCH_DEBOUNCE_MS = 320;
+const MIN_SEARCH_QUERY_LENGTH = 2;
 
 const buildQueryString = (
   params: Record<string, string | number | boolean | null | undefined>
@@ -2259,9 +2264,14 @@ const Index = () => {
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchRequestIdRef = useRef(0);
   const destInputRef = useRef<TextInput>(null);
   const [selectedTransportMode, setSelectedTransportMode] = useState<TransportMode>('walking');
   const [routeData, setRouteData] = useState<any>(null);
+  const [walkingRouteDistanceMeters, setWalkingRouteDistanceMeters] = useState<number | null>(null);
+  const [walkingRouteDurationSeconds, setWalkingRouteDurationSeconds] = useState<number | null>(
+    null
+  );
   const [selectedRouteSegment, setSelectedRouteSegment] = useState<SelectedRouteSegment | null>(
     null
   );
@@ -2283,7 +2293,6 @@ const Index = () => {
   const isMapDraggingRef = useRef(false);
   const lastMapDragFinishedAtRef = useRef(0);
   const zoomLevelRef = useRef(15);
-  const lastCameraStateSyncAtRef = useRef(0);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportText, setReportText] = useState('');
   const [reportLocation, setReportLocation] = useState<LocationData | null>(null);
@@ -2296,9 +2305,12 @@ const Index = () => {
 
   const MIN_ZOOM = 3;
   const MAX_ZOOM = 20;
-  const ZOOM_STEP = 0.6;
+  const ZOOM_STEP = 1;
+  const ZOOM_BUTTON_ANIMATION_DURATION_MS = 120;
+  const SEARCH_RESULT_PREVIEW_ZOOM = 12;
+  const SEARCH_RESULT_MIN_ZOOM_OUT_DELTA = 1;
+  const SEARCH_RESULT_FLYTO_DURATION_MS = 800;
   const ZOOM_SYNC_EPSILON = 0.05;
-  const CAMERA_STATE_SYNC_INTERVAL_MS = 120;
   const MAP_PRESS_AFTER_DRAG_BLOCK_MS = 650;
   const LONG_PRESS_DURATION = 5000; // 5 seconds
 
@@ -2332,7 +2344,11 @@ const Index = () => {
 
   const closeDestinationOverlay = () => {
     setIsDestinationOverlayVisible(false);
-    setSearchResults([]);
+    searchRequestIdRef.current += 1;
+    setIsSearching(false);
+    startTransition(() => {
+      setSearchResults([]);
+    });
   };
 
   const closeMapPointModal = () => {
@@ -2392,12 +2408,6 @@ const Index = () => {
     }
     isMapDraggingRef.current = true;
 
-    const now = Date.now();
-    if (now - lastCameraStateSyncAtRef.current < CAMERA_STATE_SYNC_INTERVAL_MS) {
-      return;
-    }
-    lastCameraStateSyncAtRef.current = now;
-
     const nextCenter = extractCenterFromCameraEvent(event);
     if (nextCenter) {
       setCenterCoordinateRef(nextCenter);
@@ -2405,7 +2415,7 @@ const Index = () => {
 
     const nextZoom = extractZoomFromCameraEvent(event);
     if (nextZoom !== null && Math.abs(zoomLevelRef.current - nextZoom) >= ZOOM_SYNC_EPSILON) {
-      syncZoomLevel(nextZoom);
+      zoomLevelRef.current = clampZoomLevel(nextZoom);
     }
   };
 
@@ -2426,21 +2436,15 @@ const Index = () => {
     }
   };
 
-  // Handle long press on the map to report a location
+  // Handle long press on the map: open the same point menu as tap
   const handleMapLongPress = (e: any) => {
     try {
       mapLongPressTimestampRef.current = Date.now();
-      // Mapbox onPress/longPress events include geometry.coordinates = [lng, lat]
-      const coords = e?.geometry?.coordinates || e?.properties?.coordinate || null;
-      if (coords && Array.isArray(coords) && coords.length >= 2) {
-        const [longitude, latitude] = coords;
-        setReportLocation({ latitude, longitude });
-        setReportText('');
-        setFeedbackType(null);
-        setSeverity(null);
-        setIsSubmittingReport(false);
-        setShowReportModal(true);
+      const coordinate = extractCoordinateFromMapPressEvent(e);
+      if (!coordinate) {
+        return;
       }
+      openMapPointModalForCoordinate(coordinate);
     } catch (err) {
       console.warn('Failed to read long press coordinates', err);
     }
@@ -2451,7 +2455,7 @@ const Index = () => {
     cameraRef.current?.setCamera({
       zoomLevel: nextZoom,
       animationMode: 'easeTo',
-      animationDuration: 220,
+      animationDuration: ZOOM_BUTTON_ANIMATION_DURATION_MS,
     });
   };
 
@@ -2460,7 +2464,7 @@ const Index = () => {
     cameraRef.current?.setCamera({
       zoomLevel: nextZoom,
       animationMode: 'easeTo',
-      animationDuration: 220,
+      animationDuration: ZOOM_BUTTON_ANIMATION_DURATION_MS,
     });
   };
 
@@ -2656,40 +2660,70 @@ const Index = () => {
   }, [locationRetry]);
 
   const searchPlaces = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
+    const normalizedQuery = query.trim();
+    const requestId = searchRequestIdRef.current + 1;
+    searchRequestIdRef.current = requestId;
+
+    if (!normalizedQuery || normalizedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+      setIsSearching(false);
+      startTransition(() => {
+        setSearchResults([]);
+      });
       return;
     }
 
-    if (query === 'Current Location') {
-      setSearchResults([]);
+    if (normalizedQuery === 'Current Location') {
+      setIsSearching(false);
+      startTransition(() => {
+        setSearchResults([]);
+      });
       return;
     }
 
     try {
       setIsSearching(true);
-      const results = await searchPlacesWithOpenStreet(query);
-      setSearchResults(results);
+      const results = await searchPlacesWithOpenStreet(normalizedQuery);
+      if (searchRequestIdRef.current === requestId) {
+        startTransition(() => {
+          setSearchResults(results);
+        });
+      }
     } catch {
-      setSearchResults([]);
+      if (searchRequestIdRef.current === requestId) {
+        startTransition(() => {
+          setSearchResults([]);
+        });
+      }
     } finally {
-      setIsSearching(false);
+      if (searchRequestIdRef.current === requestId) {
+        setIsSearching(false);
+      }
     }
   };
 
   const activeQuery = activeSearchField === 'start' ? startQuery : destQuery;
+  const deferredActiveQuery = useDeferredValue(activeQuery);
 
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
 
-    if (!isDestinationOverlayVisible || !activeQuery.trim()) {
-      setSearchResults([]);
+    const trimmedQuery = deferredActiveQuery.trim();
+    if (
+      !isDestinationOverlayVisible ||
+      !trimmedQuery ||
+      trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH
+    ) {
+      searchRequestIdRef.current += 1;
+      setIsSearching(false);
+      startTransition(() => {
+        setSearchResults([]);
+      });
     } else {
       searchTimeoutRef.current = setTimeout(() => {
-        searchPlaces(activeQuery);
-      }, 400);
+        searchPlaces(deferredActiveQuery);
+      }, SEARCH_DEBOUNCE_MS);
     }
 
     return () => {
@@ -2697,7 +2731,7 @@ const Index = () => {
         clearTimeout(searchTimeoutRef.current);
       }
     };
-  }, [activeQuery, isDestinationOverlayVisible]);
+  }, [deferredActiveQuery, isDestinationOverlayVisible]);
 
   async function handleGetRoute(
     destinationOverride?: [number, number],
@@ -3033,6 +3067,21 @@ const Index = () => {
     });
   };
 
+  const handleReportUnsafeLocationFromMapPoint = () => {
+    if (!mapSelectionCoordinate) {
+      return;
+    }
+
+    const [longitude, latitude] = mapSelectionCoordinate;
+    closeMapPointModal();
+    setReportLocation({ latitude, longitude });
+    setReportText('');
+    setFeedbackType(null);
+    setSeverity(null);
+    setIsSubmittingReport(false);
+    setShowReportModal(true);
+  };
+
   const handleTransportModeChange = (mode: TransportMode) => {
     if (mode === selectedTransportMode) {
       return;
@@ -3057,7 +3106,11 @@ const Index = () => {
       return;
     }
 
-    const targetZoom = syncZoomLevel(15);
+    const targetZoom = syncZoomLevel(
+      zoomLevelRef.current > SEARCH_RESULT_PREVIEW_ZOOM
+        ? SEARCH_RESULT_PREVIEW_ZOOM
+        : zoomLevelRef.current - SEARCH_RESULT_MIN_ZOOM_OUT_DELTA
+    );
     setCenterCoordinateRef(coord);
     setSearchResults([]);
     closeDestinationOverlay();
@@ -3066,8 +3119,8 @@ const Index = () => {
       cameraRef.current.setCamera({
         centerCoordinate: coord,
         zoomLevel: targetZoom,
-        animationMode: 'easeTo',
-        animationDuration: 500,
+        animationMode: 'flyTo',
+        animationDuration: SEARCH_RESULT_FLYTO_DURATION_MS,
       });
     }
 
@@ -3097,6 +3150,14 @@ const Index = () => {
 
   const renderDestinationPanelContent = () => {
     if (activeQuery.trim().length > 0) {
+      if (activeQuery.trim().length < MIN_SEARCH_QUERY_LENGTH) {
+        return (
+          <Text style={styles.emptyDestinationText}>
+            Type at least {MIN_SEARCH_QUERY_LENGTH} characters.
+          </Text>
+        );
+      }
+
       if (searchResults.length > 0) {
         return (
           <FlatList
@@ -3147,8 +3208,21 @@ const Index = () => {
     []
   );
 
-  const walkingDistanceLabel = formatDistance(getRouteDistanceMeters(routeData));
-  const walkingDurationLabel = formatWalkingDuration(getRouteDurationSeconds(routeData));
+  useEffect(() => {
+    if (!routeData) {
+      setWalkingRouteDistanceMeters(null);
+      setWalkingRouteDurationSeconds(null);
+      return;
+    }
+
+    const distanceMeters = getRouteDistanceMeters(routeData);
+    const durationSeconds = getRouteDurationSeconds(routeData);
+    setWalkingRouteDistanceMeters(distanceMeters);
+    setWalkingRouteDurationSeconds(durationSeconds);
+  }, [routeData]);
+
+  const walkingDistanceLabel = formatDistance(walkingRouteDistanceMeters);
+  const walkingDurationLabel = formatWalkingDuration(walkingRouteDurationSeconds);
   const transitDurationLabel = formatWalkingDuration(transitItinerary?.duration_s ?? null);
   const transitWalkingDurationLabel = formatWalkingDuration(
     transitItinerary?.walking_duration_s ?? null
@@ -3166,6 +3240,8 @@ const Index = () => {
   const transitJourneySteps = buildTransitJourneySteps(transitItinerary);
   const hasPlannedRoute = Boolean(routeData || transitItinerary);
   const shouldShowOnlyRouteEndpoints = Boolean(routeStart && routeEnd);
+  const isMapInteractionLocked =
+    isDestinationOverlayVisible || isMapPointModalVisible || showReportModal;
   const plannerMainContent = (() => {
     if (selectedTransportMode === 'walking') {
       if (!routeData) {
@@ -3427,7 +3503,7 @@ const Index = () => {
               </View>
             </PointAnnotation>
           )}
-          {/* Report marker placed when user long-presses the map */}
+          {/* Report marker placed when user chooses "Report unsafe location" from map point menu */}
           {!shouldShowOnlyRouteEndpoints && reportLocation && (
             <PointAnnotation
               id="reported-location"
@@ -3645,6 +3721,12 @@ const Index = () => {
               onPress={() => applyMapSelection('destination')}
             >
               <Text style={styles.mapPointActionText}>Set as destination</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.mapPointActionButton, styles.mapPointReportButton]}
+              onPress={handleReportUnsafeLocationFromMapPoint}
+            >
+              <Text style={styles.mapPointActionText}>Report unsafe location</Text>
             </Pressable>
             <Pressable
               style={[styles.mapPointActionButton, styles.mapPointCancelButton]}
