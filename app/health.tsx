@@ -1,7 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { API_PROFILE, coreEndpoints } from '../config/core-endpoints';
+import { API_PROFILE } from '../config/core-endpoints';
 
 type ServiceStatusState = 'idle' | 'checking' | 'ok' | 'error' | 'skipped';
 
@@ -38,31 +38,31 @@ const getServices = (): ServiceDefinition[] => [
     id: 'user-management',
     name: 'User Management',
     description: 'Checks user management service health endpoint',
-    url: coreEndpoints.userManagementHealthUrl || undefined,
+    url: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL || undefined,
   },
   {
     id: 'notification-service',
     name: 'Notification Service',
     description: 'Verifies notification service health endpoint',
-    url: coreEndpoints.notificationServiceHealthUrl || undefined,
+    url: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL || undefined,
   },
   {
     id: 'routing-service',
     name: 'Routing Service',
     description: 'Checks routing service health endpoint',
-    url: coreEndpoints.routingServiceHealthUrl || undefined,
+    url: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL || undefined,
   },
   {
     id: 'feedback-service',
     name: 'Feedback Service',
     description: 'Verifies feedback service health endpoint',
-    url: coreEndpoints.feedbackServiceHealthUrl || undefined,
+    url: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL || undefined,
   },
   {
     id: 'sos-service',
     name: 'SOS Service',
     description: 'Checks SOS (emergency) service health endpoint',
-    url: coreEndpoints.sosServiceHealthUrl || undefined,
+    url: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL || undefined,
   },
 ];
 

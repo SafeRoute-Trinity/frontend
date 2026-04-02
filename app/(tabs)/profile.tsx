@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -11,12 +11,10 @@ import {
   View,
 } from 'react-native';
 import GradientBackground from '../../components/ui/GradientBackground';
-import SegmentedToggle from '../../components/ui/SegmentedToggle';
-import { STORAGE_KEYS } from '../../constants/mockData';
+
 import { Routes } from '../../constants/routes';
 import { colors } from '../../constants/theme';
 import { useAuth0 } from '../../contexts/Auth0Context';
-import { storage } from '../../utils/storage';
 
 const styles = StyleSheet.create({
   container: {
@@ -175,44 +173,6 @@ const Profile = () => {
   const { user, isAuthenticated, logout, isLoading: authLoading } = useAuth0();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // Preferences State
-  const [voiceGuidanceIndex, setVoiceGuidanceIndex] = useState(0); // 0 = Yes, 1 = No
-  const [unitsIndex, setUnitsIndex] = useState(0); // 0 = km, 1 = Mile
-  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
-
-  // Load preferences from storage on mount
-  useEffect(() => {
-    const loadPreferences = async () => {
-      try {
-        const storedVoiceGuidance = await storage.getItem(STORAGE_KEYS.VOICE_GUIDANCE);
-        const storedUnits = await storage.getItem(STORAGE_KEYS.UNITS);
-
-        if (storedVoiceGuidance !== null) {
-          setVoiceGuidanceIndex(storedVoiceGuidance === 'yes' ? 0 : 1);
-        }
-        if (storedUnits !== null) {
-          setUnitsIndex(storedUnits === 'km' ? 0 : 1);
-        }
-      } finally {
-        setPreferencesLoaded(true);
-      }
-    };
-
-    loadPreferences();
-  }, []);
-
-  // Save voice guidance preference when changed
-  const handleVoiceGuidanceChange = async (index: number) => {
-    setVoiceGuidanceIndex(index);
-    await storage.setItem(STORAGE_KEYS.VOICE_GUIDANCE, index === 0 ? 'yes' : 'no');
-  };
-
-  // Save units preference when changed
-  const handleUnitsChange = async (index: number) => {
-    setUnitsIndex(index);
-    await storage.setItem(STORAGE_KEYS.UNITS, index === 0 ? 'km' : 'mile');
-  };
-
   const handleLogout = async () => {
     setIsLoggingOut(true);
     await logout();
@@ -225,7 +185,7 @@ const Profile = () => {
     // For now, return a placeholder. In production, this would come from user metadata
     'Member since Oct 2023';
 
-  if (authLoading || !preferencesLoaded) {
+  if (authLoading) {
     return (
       <GradientBackground>
         <View style={styles.loadingContainer}>
@@ -282,28 +242,6 @@ const Profile = () => {
             </View>
             <Text style={styles.userName}>{user.name ?? 'User'}</Text>
             <Text style={styles.memberSince}>{getMemberSinceDate()}</Text>
-          </View>
-
-          {/* Preferences Section */}
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Preferences</Text>
-            </View>
-            <View style={styles.card}>
-              <SegmentedToggle
-                options={['Yes', 'No']}
-                selectedIndex={voiceGuidanceIndex}
-                onSelect={handleVoiceGuidanceChange}
-                label="Voice Guidance"
-              />
-              <View style={styles.cardDivider} />
-              <SegmentedToggle
-                options={['km', 'Mile']}
-                selectedIndex={unitsIndex}
-                onSelect={handleUnitsChange}
-                label="Distance Units"
-              />
-            </View>
           </View>
 
           {/* Account Settings Section */}

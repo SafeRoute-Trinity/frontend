@@ -17,6 +17,7 @@ import GradientBackground from '../../components/ui/GradientBackground';
 import { API_URL } from '../../config/api';
 import { InputFocus, InputFocusType } from '../../constants/routes';
 import { colors } from '../../constants/theme';
+import { useAuth0 } from '../../contexts/Auth0Context';
 
 type RecaptchaRef = { open: () => void };
 
@@ -254,6 +255,7 @@ const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
 
 const Help = () => {
   const router = useRouter();
+  const { user } = useAuth0();
   const recaptchaRef = useRef<RecaptchaRef | null>(null);
   // const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -290,6 +292,8 @@ const Help = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          user_id: user?.sub?.replace(/^auth0\|/, ''),
+          email: user?.email,
           content: feedbackText.trim(),
           privacy_accepted: privacyAccepted,
           captcha_token: recaptchaToken,

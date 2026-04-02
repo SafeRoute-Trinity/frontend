@@ -1,10 +1,9 @@
 import { Platform } from 'react-native';
-import { coreEndpoints } from './core-endpoints';
 
 // Determine API URL based on platform
 const getApiUrl = () => {
-  if (coreEndpoints.backendBaseUrl) {
-    return coreEndpoints.backendBaseUrl;
+  if (process.env.EXPO_PUBLIC_API_URL) {
+    return process.env.EXPO_PUBLIC_API_URL;
   }
 
   // Development defaults
@@ -26,9 +25,6 @@ export const API_URL = getApiUrl();
 const getSosApiUrl = () => {
   if (process.env.EXPO_PUBLIC_SOS_API_URL) {
     return process.env.EXPO_PUBLIC_SOS_API_URL;
-  }
-  if (coreEndpoints.backendBaseUrl) {
-    return coreEndpoints.backendBaseUrl;
   }
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
