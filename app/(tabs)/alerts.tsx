@@ -436,15 +436,14 @@ const Alerts = () => {
 
       (async () => {
         try {
-          setLoadingContacts(true);
+          if (contacts.length === 0) setLoadingContacts(true);
           setContactsLoadError(null);
-          const res = await fetchTrustedContacts(userId);
+          const res = await fetchTrustedContacts(userId, 1, 1);
           if (!cancelled) {
             setContacts(res.data ?? []);
           }
         } catch (err) {
-          if (!cancelled) {
-            setContacts([]);
+          if (!cancelled && contacts.length === 0) {
             setContactsLoadError(
               'Unable to load trusted contacts right now. You can manage contacts in the Contacts tab and try again.'
             );

@@ -49,7 +49,7 @@ export interface CreateContactPayload {
 export async function fetchTrustedContacts(
   userId: string,
   page: number = 1,
-  pageSize: number = 50
+  pageSize: number = 20
 ): Promise<TrustedContactsListResponse> {
   const response = await apiClient.get(
     `/v1/users/${encodeURIComponent(userId)}/trusted-contacts?page=${page}&page_size=${pageSize}`
