@@ -144,7 +144,7 @@ const Contacts = () => {
       const response = await fetchTrustedContacts(userId);
       setContacts(response.data);
     } catch (err: any) {
-      console.error('Failed to load contacts:', err);
+      console.log('Failed to load contacts:', err);
       setError(err.message || 'Failed to load contacts');
     } finally {
       setIsLoading(false);

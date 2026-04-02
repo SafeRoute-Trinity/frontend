@@ -26,6 +26,8 @@ const TabLayout = () => (
   <Tabs
     screenOptions={{
       headerShown: false,
+      lazy: true,
+      freezeOnBlur: true,
       tabBarStyle: {
         backgroundColor: colors.background,
         borderTopColor: colors.border,
