@@ -95,10 +95,9 @@ export async function replaceTrustedContacts(
   userId: string,
   contacts: CreateContactPayload[]
 ): Promise<TrustedContactsSetResponse> {
-  const response = await apiClient.put(
-    `/v1/users/${encodeURIComponent(userId)}/trusted-contacts`,
-    { contacts }
-  );
+  const response = await apiClient.put(`/v1/users/${encodeURIComponent(userId)}/trusted-contacts`, {
+    contacts,
+  });
 
   if (!response.ok) {
     const errorText = await response.text().catch(() => response.statusText);
