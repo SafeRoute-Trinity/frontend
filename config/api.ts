@@ -26,9 +26,6 @@ const getSosApiUrl = () => {
   if (process.env.EXPO_PUBLIC_SOS_API_URL) {
     return process.env.EXPO_PUBLIC_SOS_API_URL;
   }
-  if (coreEndpoints.backendBaseUrl) {
-    return coreEndpoints.backendBaseUrl;
-  }
   if (process.env.EXPO_PUBLIC_API_URL) {
     return process.env.EXPO_PUBLIC_API_URL;
   }
