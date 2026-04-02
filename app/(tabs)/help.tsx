@@ -309,7 +309,6 @@ const Help = () => {
               ? errorData.detail
               : JSON.stringify(errorData.detail);
         }
-        console.log('Feedback submission error:', response.status, errorData);
         Alert.alert('Submission Failed', errorMessage);
       }
     } catch {
@@ -338,6 +337,18 @@ const Help = () => {
   };
 
   const isSubmitEnabled = feedbackText.trim().length > 0 && privacyAccepted && !!recaptchaToken;
+  const recaptchaStatusLabel = (() => {
+    if (!IS_RECAPTCHA_AVAILABLE) {
+      return 'reCAPTCHA unavailable in this build';
+    }
+    if (recaptchaToken) {
+      return 'reCAPTCHA verified';
+    }
+    return 'reCAPTCHA verification required';
+  })();
+  const canVerifyBeforeSubmit =
+    !recaptchaToken && feedbackText.trim() && privacyAccepted && IS_RECAPTCHA_AVAILABLE;
+  const submitButtonLabel = canVerifyBeforeSubmit ? 'Verify & Submit' : 'Submit';
 
   return (
     <GradientBackground>
@@ -499,11 +510,7 @@ const Help = () => {
                     recaptchaToken && styles.recaptchaVerifiedText,
                   ]}
                 >
-                  {!IS_RECAPTCHA_AVAILABLE
-                    ? 'reCAPTCHA unavailable in this build'
-                    : recaptchaToken
-                      ? 'reCAPTCHA verified'
-                      : 'reCAPTCHA verification required'}
+                  {recaptchaStatusLabel}
                 </Text>
               </View>
 
@@ -521,11 +528,7 @@ const Help = () => {
                 }}
                 disabled={!feedbackText.trim() || !privacyAccepted}
               >
-                <Text style={styles.modalSubmitText}>
-                  {!recaptchaToken && feedbackText.trim() && privacyAccepted && IS_RECAPTCHA_AVAILABLE
-                    ? 'Verify & Submit'
-                    : 'Submit'}
-                </Text>
+                <Text style={styles.modalSubmitText}>{submitButtonLabel}</Text>
               </Pressable>
             </Pressable>
           </Pressable>
@@ -539,8 +542,7 @@ const Help = () => {
             baseUrl={API_URL}
             onVerify={handleRecaptchaVerify}
             onExpire={handleRecaptchaExpire}
-            onError={(err: unknown) => {
-              console.error('reCAPTCHA error:', err);
+            onError={() => {
               Alert.alert('reCAPTCHA Error', 'Verification failed. Please try again.');
             }}
             size="invisible"
