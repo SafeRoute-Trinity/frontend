@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { randomUUID } from 'expo-crypto';
 import * as Location from 'expo-location';
 import { useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -40,6 +39,14 @@ const SURFACE_LIGHT = '#252525';
 // ── Types ────────────────────────────────────────────────────────────────────
 
 type SOSPhase = 'idle' | 'holding' | 'countdown' | 'sent';
+
+const createSosId = (): string => {
+  const nativeRandomUUID = globalThis.crypto?.randomUUID;
+  if (typeof nativeRandomUUID === 'function') {
+    return nativeRandomUUID.call(globalThis.crypto);
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 // ── Styles ─────────────────────────────────────────────────────────────────
 
@@ -436,14 +443,15 @@ const Alerts = () => {
 
       (async () => {
         try {
-          if (contacts.length === 0) setLoadingContacts(true);
+          setLoadingContacts(true);
           setContactsLoadError(null);
-          const res = await fetchTrustedContacts(userId, 1, 1);
+          const res = await fetchTrustedContacts(userId);
           if (!cancelled) {
             setContacts(res.data ?? []);
           }
         } catch (err) {
-          if (!cancelled && contacts.length === 0) {
+          if (!cancelled) {
+            setContacts([]);
             setContactsLoadError(
               'Unable to load trusted contacts right now. You can manage contacts in the Contacts tab and try again.'
             );
@@ -515,7 +523,7 @@ const Alerts = () => {
     }
 
     try {
-      const sosId = randomUUID();
+      const sosId = createSosId();
       const res = await sendEmergencySMS({
         sos_id: sosId,
         user_id: userId,
