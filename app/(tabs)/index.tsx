@@ -107,7 +107,7 @@ interface SearchResult {
   id: string;
   place_name: string;
   center?: [number, number] | null; // [longitude, latitude]
-  provider?: 'mapbox' | 'google' | 'osm';
+  provider?: 'mapbox' | 'google' | 'osm' | 'local';
   place_id?: string;
 }
 
@@ -156,6 +156,7 @@ interface SelectedRouteSegment {
 }
 
 const RECENT_DESTINATIONS_STORAGE_KEY = 'recent_destinations_v1';
+const CURRENT_LOCATION_RESULT_ID = 'local-current-location';
 
 const isSearchResult = (value: unknown): value is SearchResult => {
   if (!value || typeof value !== 'object') {
@@ -743,6 +744,11 @@ const styles = StyleSheet.create({
     zIndex: 1000,
     alignItems: 'stretch',
   },
+  routeInputsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   routeInputsCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -758,6 +764,9 @@ const styles = StyleSheet.create({
     elevation: 5,
     overflow: 'hidden',
   },
+  routeInputsCardMain: {
+    flex: 1,
+  },
   routeInputTrigger: {
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -766,6 +775,33 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: '#E5E7EB',
     marginHorizontal: 12,
+  },
+  routeSwitchButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.18,
+    shadowRadius: 2.5,
+    elevation: 4,
+  },
+  routeSwitchButtonDisabled: {
+    opacity: 0.6,
+  },
+  routeSwitchButtonIcon: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#2563EB',
+    lineHeight: 22,
   },
   transportModeContainer: {
     position: 'absolute',
@@ -3370,9 +3406,47 @@ const Index = () => {
     }
   };
 
+  const handleSwapRouteEndpoints = () => {
+    if (isLoadingRoute || !routeStart || !routeEnd) {
+      return;
+    }
+
+    const nextStart = routeEnd;
+    const nextEnd = routeStart;
+    const nextStartLabel =
+      destQuery.trim().length > 0 ? destQuery : formatCoordinateLabel(nextStart);
+    const nextDestLabel =
+      startQuery.trim().length > 0 ? startQuery : formatCoordinateLabel(nextEnd);
+
+    setRouteStart(nextStart);
+    setRouteEnd(nextEnd);
+    setStartQuery(nextStartLabel);
+    setDestQuery(nextDestLabel);
+    setCenterCoordinateRef(nextStart);
+
+    handleGetRoute(nextEnd, selectedTransportMode, nextStart).catch((error) => {
+      console.warn('Failed to swap start and destination', error);
+    });
+  };
+
   const handleSelectLocation = async (result: SearchResult) => {
-    const coord = await resolveSearchResultCoordinates(result);
+    const isCurrentLocationSelection = result.id === CURRENT_LOCATION_RESULT_ID;
+    let coord = await resolveSearchResultCoordinates(result);
+    if (!coord && isCurrentLocationSelection) {
+      if (location) {
+        coord = [location.longitude, location.latitude];
+      } else if (routeStart) {
+        coord = routeStart;
+      }
+    }
     if (!coord) {
+      if (isCurrentLocationSelection) {
+        Alert.alert(
+          'Current Location Unavailable',
+          'Your current location is not ready yet. Please try again in a moment.'
+        );
+        return;
+      }
       Alert.alert('Location Not Found', 'Could not resolve this destination. Try another result.');
       return;
     }
@@ -3402,7 +3476,7 @@ const Index = () => {
 
     if (activeSearchField === 'start') {
       setRouteStart(coord);
-      setStartQuery(result.place_name);
+      setStartQuery(isCurrentLocationSelection ? 'Current location' : result.place_name);
       if (routeEnd) {
         handleGetRoute(routeEnd, selectedTransportMode, coord);
       }
@@ -3410,11 +3484,13 @@ const Index = () => {
     }
 
     setRouteEnd(coord);
-    setDestQuery(result.place_name);
-    setRecentDestinations((prev) => {
-      const deduped = prev.filter((item) => item.id !== result.id);
-      return [{ ...result, center: coord }, ...deduped].slice(0, 5);
-    });
+    setDestQuery(isCurrentLocationSelection ? 'Current location' : result.place_name);
+    if (!isCurrentLocationSelection) {
+      setRecentDestinations((prev) => {
+        const deduped = prev.filter((item) => item.id !== result.id);
+        return [{ ...result, center: coord }, ...deduped].slice(0, 5);
+      });
+    }
     handleGetRoute(coord);
   };
 
@@ -3425,8 +3501,37 @@ const Index = () => {
   );
 
   const renderDestinationPanelContent = () => {
+    const currentLocationOption: SearchResult[] = [
+      {
+        id: CURRENT_LOCATION_RESULT_ID,
+        place_name: 'Current location',
+        center: location ? [location.longitude, location.latitude] : (routeStart ?? null),
+        provider: 'local',
+      },
+    ];
+    const withCurrentLocationOption = (items: SearchResult[]) => [
+      ...currentLocationOption,
+      ...items.filter((item) => item.id !== CURRENT_LOCATION_RESULT_ID),
+    ];
+
     if (activeQuery.trim().length > 0) {
       if (activeQuery.trim().length < MIN_SEARCH_QUERY_LENGTH) {
+        if (currentLocationOption.length > 0) {
+          return (
+            <FlatList
+              data={currentLocationOption}
+              keyExtractor={(item) => item.id}
+              style={styles.searchResultsList}
+              keyboardShouldPersistTaps="handled"
+              renderItem={renderDestinationResultItem}
+              ListFooterComponent={
+                <Text style={styles.emptyDestinationText}>
+                  Type at least {MIN_SEARCH_QUERY_LENGTH} characters.
+                </Text>
+              }
+            />
+          );
+        }
         return (
           <Text style={styles.emptyDestinationText}>
             Type at least {MIN_SEARCH_QUERY_LENGTH} characters.
@@ -3437,7 +3542,7 @@ const Index = () => {
       if (searchResults.length > 0) {
         return (
           <FlatList
-            data={searchResults}
+            data={withCurrentLocationOption(searchResults)}
             keyExtractor={(item) => item.id}
             style={styles.searchResultsList}
             keyboardShouldPersistTaps="handled"
@@ -3447,7 +3552,35 @@ const Index = () => {
       }
 
       if (isSearching) {
+        if (currentLocationOption.length > 0) {
+          return (
+            <FlatList
+              data={currentLocationOption}
+              keyExtractor={(item) => item.id}
+              style={styles.searchResultsList}
+              keyboardShouldPersistTaps="handled"
+              renderItem={renderDestinationResultItem}
+            />
+          );
+        }
         return null;
+      }
+
+      if (currentLocationOption.length > 0) {
+        return (
+          <FlatList
+            data={currentLocationOption}
+            keyExtractor={(item) => item.id}
+            style={styles.searchResultsList}
+            keyboardShouldPersistTaps="handled"
+            renderItem={renderDestinationResultItem}
+            ListFooterComponent={
+              <Text style={styles.emptyDestinationText}>
+                No results found in Dublin. Try another keyword.
+              </Text>
+            }
+          />
+        );
       }
 
       return (
@@ -3460,7 +3593,19 @@ const Index = () => {
     if (recentDestinations.length > 0) {
       return (
         <FlatList
-          data={recentDestinations}
+          data={withCurrentLocationOption(recentDestinations)}
+          keyExtractor={(item) => item.id}
+          style={styles.searchResultsList}
+          keyboardShouldPersistTaps="handled"
+          renderItem={renderDestinationResultItem}
+        />
+      );
+    }
+
+    if (currentLocationOption.length > 0) {
+      return (
+        <FlatList
+          data={currentLocationOption}
           keyExtractor={(item) => item.id}
           style={styles.searchResultsList}
           keyboardShouldPersistTaps="handled"
@@ -3858,41 +4003,53 @@ const Index = () => {
 
       <View style={styles.searchWrapper}>
         {hasPlannedRoute ? (
-          <View style={styles.routeInputsCard}>
+          <View style={styles.routeInputsRow}>
+            <View style={[styles.routeInputsCard, styles.routeInputsCardMain]}>
+              <Pressable
+                style={styles.routeInputTrigger}
+                onPress={() => openDestinationOverlay('start')}
+              >
+                <View style={styles.destinationTriggerContent}>
+                  <Text style={styles.searchIcon}>📍</Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.destinationTriggerText,
+                      !startQuery && styles.destinationTriggerPlaceholder,
+                    ]}
+                  >
+                    {startQuery || 'Current location'}
+                  </Text>
+                </View>
+              </Pressable>
+              <View style={styles.routeInputDivider} />
+              <Pressable
+                style={styles.routeInputTrigger}
+                onPress={() => openDestinationOverlay('destination')}
+              >
+                <View style={styles.destinationTriggerContent}>
+                  <Text style={styles.searchIcon}>🏁</Text>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.destinationTriggerText,
+                      !destQuery && styles.destinationTriggerPlaceholder,
+                    ]}
+                  >
+                    {destQuery || 'Search destination in Dublin'}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
             <Pressable
-              style={styles.routeInputTrigger}
-              onPress={() => openDestinationOverlay('start')}
+              style={[
+                styles.routeSwitchButton,
+                (isLoadingRoute || !routeStart || !routeEnd) && styles.routeSwitchButtonDisabled,
+              ]}
+              onPress={handleSwapRouteEndpoints}
+              disabled={isLoadingRoute || !routeStart || !routeEnd}
             >
-              <View style={styles.destinationTriggerContent}>
-                <Text style={styles.searchIcon}>📍</Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.destinationTriggerText,
-                    !startQuery && styles.destinationTriggerPlaceholder,
-                  ]}
-                >
-                  {startQuery || 'Current location'}
-                </Text>
-              </View>
-            </Pressable>
-            <View style={styles.routeInputDivider} />
-            <Pressable
-              style={styles.routeInputTrigger}
-              onPress={() => openDestinationOverlay('destination')}
-            >
-              <View style={styles.destinationTriggerContent}>
-                <Text style={styles.searchIcon}>🏁</Text>
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    styles.destinationTriggerText,
-                    !destQuery && styles.destinationTriggerPlaceholder,
-                  ]}
-                >
-                  {destQuery || 'Search destination in Dublin'}
-                </Text>
-              </View>
+              <Text style={styles.routeSwitchButtonIcon}>⇅</Text>
             </Pressable>
           </View>
         ) : (
