@@ -1,46 +1,189 @@
-# Welcome to your Expo app 👋
+# SafeRoute Frontend (Expo + React Native)
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Mobile app for SafeRoute route planning, safety-aware walking, and public transit guidance.
 
-## Get started
+This app is built with:
+- Expo SDK 54
+- React Native 0.81
+- Expo Router
+- Mapbox (`@rnmapbox/maps`)
+- Auth0 (`react-native-auth0`)
 
-1. Install dependencies
+## Project Structure
 
-   ```bash
-   npm install
-   ```
+- `./app` route screens and UI
+- `./config/core-endpoints.ts` local/public API profile switch
+- `./contexts/Auth0Context.tsx` authentication flow
+- `./api` service wrappers
+- `./assets` icons and images
 
-2. Configure environment variables
+## Prerequisites
 
-   In `.env` update each URL to point at your deployed or locally running health endpoints. All variables must start with `EXPO_PUBLIC_` so that they are embedded in the Expo bundle.
-   - Auth-only services (Auth0, Grafana, Prometheus, Mapbox, API Gateway) can reference their native health endpoints or an authenticated proxy.
-   - Non-HTTP infrastructure (PostgreSQL/PostGIS, RabbitMQ, Redis) should expose an HTTP health bridge via your backend microservices. Each bridge route should attempt a lightweight operation (e.g., `SELECT 1`, `PING`, queue inspection) and return `200` on success.
+- Node.js 20+
+- npm 10+
+- Xcode + iOS Simulator (for iOS development)
+- A running SafeRoute backend (local or public)
+- Valid Mapbox token and Auth0 settings
 
-3. Start the app
+## Quick Start (iOS Local Development)
 
-   ```bash
-   npx expo run
-   ```
+1. Install dependencies:
 
-In the output, you'll find options to open the app in a
+```bash
+npm install
+```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+2. Create env file:
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+```bash
+cp .env.example .env
+```
 
-## Learn more
+3. Update required variables in `./.env`:
+- `EXPO_PUBLIC_API_PROFILE`
+- `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN`
+- `EXPO_PUBLIC_AUTH0_DOMAIN`
+- `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` (if Google search/transit is used in your backend flow)
 
-To learn more about developing your project with Expo, look at the following resources:
+4. First-time native setup (or after native dependency changes):
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+```bash
+npx expo run:ios
+```
 
-## Join the community
+5. Start Metro (clean cache recommended):
 
-Join our community of developers creating universal apps.
+```bash
+npx expo start --dev-client --host localhost --clear
+```
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+6. Launch app in simulator:
+- Press `i` in Expo terminal, or
+- Open Simulator and launch `saferouteapp` dev client manually.
+
+## Backend Dependency
+
+The app expects backend services on localhost in local mode (default profile).
+
+Health endpoints typically used:
+- `http://127.0.0.1:20000/health` (user management)
+- `http://127.0.0.1:20001/health` (notification)
+- `http://127.0.0.1:20002/health` (routing)
+- `http://127.0.0.1:20004/health` (feedback)
+- `http://127.0.0.1:20006/health` (sos)
+
+If you need full local startup (backend + frontend + admin), follow:
+- `../RUN_ALL_SERVICES.md`
+
+## Environment Variables
+
+Reference template: `./.env.example`
+
+Main variables:
+- `EXPO_PUBLIC_API_PROFILE=local|public`
+- `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN=...`
+- `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY=...`
+- `EXPO_PUBLIC_AUTH0_DOMAIN=...`
+- `EXPO_PUBLIC_API_BASE_URL=...`
+- `EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL=...`
+- `EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL=...`
+- `EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL=...`
+- `EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL=...`
+- `EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL=...`
+
+Important behavior:
+- Endpoint resolution is profile-aware in `./config/core-endpoints.ts`.
+- If `EXPO_PUBLIC_API_PROFILE` is explicitly set (`local` or `public`), profile defaults are used.
+- If `EXPO_PUBLIC_API_PROFILE` is not set, specific endpoint env vars can override defaults.
+
+## Useful Commands
+
+```bash
+# Start dev server
+npm run start
+
+# iOS build/run
+npm run ios
+
+# Android build/run
+npm run android
+
+# Lint
+npm run lint
+
+# Auto-fix lint issues
+npm run lint:fix
+
+# Format code
+npm run format
+```
+
+## Routing Behavior (Frontend Side)
+
+- Walking:
+  - Calls backend route API (`/v1/routes/calculate`).
+  - Falls back to Mapbox geometry preview if needed.
+- Public transit:
+  - Calls `/v1/transit/plan`.
+  - Falls back to walking route if transit itinerary is unavailable.
+
+The mode switch and segmented route rendering happen in:
+- `./app/(tabs)/index.tsx`
+
+## Troubleshooting
+
+### 1. App opens but API calls fail (`Network request failed`)
+
+Check:
+- Backend is running and reachable.
+- `EXPO_PUBLIC_API_PROFILE` matches your environment.
+- Health URLs in env are correct.
+
+Quick check:
+
+```bash
+curl http://127.0.0.1:20002/health
+```
+
+### 2. Simulator shows stale UI
+
+Use a full refresh:
+- Restart Metro with `--clear`
+- Restart Simulator
+- Relaunch app
+
+### 3. Map does not render
+
+Check:
+- `EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN` is valid.
+- You are running iOS/Android dev client (not relying on unsupported web-only map flow).
+
+### 4. Login/Auth0 errors
+
+Check:
+- `EXPO_PUBLIC_AUTH0_DOMAIN`
+- Backend Auth0 audience/domain alignment
+
+Also refer to:
+- `./AUTH0_SETUP_GUIDE.md`
+- `./AUTH0_CUSTOM_SIGNUP.md`
+
+### 5. CI/lint failures
+
+Run locally before pushing:
+
+```bash
+npm run lint
+```
+
+## Additional Docs
+
+- `./MAPBOX_SETUP.md`
+- `./AUTH0_SETUP_GUIDE.md`
+- `./AUTH0_CUSTOM_SIGNUP.md`
+- `./CI_SETUP.md`
+
+## Notes
+
+- Do not commit secrets from `./.env`.
+- Keep public and local endpoint profiles consistent with backend deployment mode.
