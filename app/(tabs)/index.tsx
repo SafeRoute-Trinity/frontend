@@ -3313,7 +3313,8 @@ const Index = () => {
             location,
             enteredZoneIds: nextZoneIds,
           });
-          Alert.alert(HIGH_RISK_ALERT_TITLE, HIGH_RISK_BANNER_MESSAGE);
+          // High-risk alert popup — disabled until endpoint is stable
+          // Alert.alert(HIGH_RISK_ALERT_TITLE, HIGH_RISK_BANNER_MESSAGE);
         }
 
         if (wasInsideHighRiskArea && !isInsideHighRiskArea) {
@@ -4282,6 +4283,7 @@ const Index = () => {
         </Pressable>
       </View>
 
+      {/* High-risk area status banner — disabled until endpoint is stable
       <View
         style={[
           styles.riskZoneStatusBanner,
@@ -4292,6 +4294,7 @@ const Index = () => {
           {isHighRiskArea ? HIGH_RISK_BANNER_MESSAGE : highRiskStatusText}
         </Text>
       </View>
+      */}
 
       <View style={styles.searchWrapper}>
         {hasPlannedRoute ? (
