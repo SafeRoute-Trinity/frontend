@@ -1,4 +1,11 @@
-import Mapbox, { Camera, LineLayer, PointAnnotation, ShapeSource } from '@rnmapbox/maps';
+import Mapbox, {
+  Camera,
+  CircleLayer,
+  FillLayer,
+  LineLayer,
+  PointAnnotation,
+  ShapeSource,
+} from '@rnmapbox/maps';
 import * as Location from 'expo-location';
 import { useRouter } from 'expo-router';
 import { startTransition, useDeferredValue, useEffect, useRef, useState } from 'react';
@@ -566,8 +573,94 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
+  controlRoundButtonActive: {
+    backgroundColor: '#2563EB',
+    borderWidth: 1,
+    borderColor: 'rgba(147, 197, 253, 0.8)',
+  },
   controlIconText: {
     fontSize: 20,
+  },
+  centerLocationIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerLocationRing: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#2563EB',
+    backgroundColor: 'rgba(37, 99, 235, 0.04)',
+  },
+  centerLocationArrow: {
+    width: 0,
+    height: 0,
+    borderLeftWidth: 5,
+    borderRightWidth: 5,
+    borderBottomWidth: 12,
+    borderLeftColor: 'transparent',
+    borderRightColor: 'transparent',
+    borderBottomColor: '#2563EB',
+    transform: [{ translateY: -1 }],
+  },
+  navModeIcon: {
+    width: 24,
+    height: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navModeOuterRing: {
+    position: 'absolute',
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
+    borderColor: '#2563EB',
+    backgroundColor: 'rgba(37, 99, 235, 0.03)',
+  },
+  navModeTopTick: {
+    position: 'absolute',
+    top: 0,
+    width: 8,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#2563EB',
+  },
+  navModeLeftTick: {
+    position: 'absolute',
+    left: 1,
+    width: 4,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#2563EB',
+  },
+  navModeRightTick: {
+    position: 'absolute',
+    right: 1,
+    width: 4,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#2563EB',
+  },
+  navModeBottomTick: {
+    position: 'absolute',
+    bottom: 1,
+    width: 4,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: '#2563EB',
+  },
+  navModeArrow: {
+    width: 8,
+    height: 8,
+    borderTopWidth: 2,
+    borderRightWidth: 2,
+    borderColor: '#2563EB',
+    transform: [{ rotate: '-45deg' }],
   },
   zoomControls: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -1005,6 +1098,10 @@ const DEFAULT_LOCATION = {
 };
 
 const normalizeHeadingDegrees = (heading: number) => ((heading % 360) + 360) % 360;
+const getHeadingDeltaDegrees = (from: number, to: number) => {
+  const delta = Math.abs(normalizeHeadingDegrees(from) - normalizeHeadingDegrees(to));
+  return Math.min(delta, 360 - delta);
+};
 
 const isSimulatorDefaultSanFrancisco = (latitude: number, longitude: number) =>
   Math.abs(latitude - 37.7749) < 0.01 && Math.abs(longitude - -122.4194) < 0.01;
@@ -1387,6 +1484,24 @@ const resolveSearchResultCoordinates = async (
 
 const formatCoordinateLabel = (coordinate: [number, number]): string =>
   `${coordinate[1].toFixed(5)}, ${coordinate[0].toFixed(5)}`;
+
+const CenterLocationIcon = ({ color = '#2563EB' }: { color?: string }) => (
+  <View style={styles.centerLocationIcon}>
+    <View style={[styles.centerLocationRing, { borderColor: color }]} />
+    <View style={[styles.centerLocationArrow, { borderBottomColor: color }]} />
+  </View>
+);
+
+const NavigationModeIcon = ({ color = '#2563EB' }: { color?: string }) => (
+  <View style={styles.navModeIcon}>
+    <View style={[styles.navModeOuterRing, { borderColor: color }]} />
+    <View style={[styles.navModeTopTick, { backgroundColor: color }]} />
+    <View style={[styles.navModeLeftTick, { backgroundColor: color }]} />
+    <View style={[styles.navModeRightTick, { backgroundColor: color }]} />
+    <View style={[styles.navModeBottomTick, { backgroundColor: color }]} />
+    <View style={[styles.navModeArrow, { borderColor: color }]} />
+  </View>
+);
 
 const fetchOpenStreetPlaceNameForCoordinate = async (
   coordinate: [number, number]
@@ -1968,6 +2083,78 @@ const getSegmentDistanceMeters = (from: [number, number], to: [number, number]):
   return EARTH_RADIUS_METERS * c;
 };
 
+const projectCoordinateByMeters = (
+  origin: [number, number],
+  distanceMeters: number,
+  bearingDegrees: number
+): [number, number] => {
+  const [lng, lat] = origin;
+  const angularDistance = distanceMeters / EARTH_RADIUS_METERS;
+  const bearingRad = toRadians(bearingDegrees);
+  const latRad = toRadians(lat);
+  const lngRad = toRadians(lng);
+
+  const projectedLatRad = Math.asin(
+    Math.sin(latRad) * Math.cos(angularDistance) +
+      Math.cos(latRad) * Math.sin(angularDistance) * Math.cos(bearingRad)
+  );
+  const projectedLngRad =
+    lngRad +
+    Math.atan2(
+      Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(latRad),
+      Math.cos(angularDistance) - Math.sin(latRad) * Math.sin(projectedLatRad)
+    );
+
+  return [toDegrees(projectedLngRad), toDegrees(projectedLatRad)];
+};
+
+const buildUserLocationFeatureCollection = (
+  coordinate: [number, number],
+  headingDegrees: number
+) => {
+  const heading = normalizeHeadingDegrees(headingDegrees);
+  const tip = projectCoordinateByMeters(coordinate, 22, heading);
+  const neck = projectCoordinateByMeters(coordinate, 10, heading);
+  const baseLeft = projectCoordinateByMeters(coordinate, 7.5, heading + 155);
+  const baseRight = projectCoordinateByMeters(coordinate, 7.5, heading - 155);
+
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Point',
+          coordinates: coordinate,
+        },
+        properties: {
+          kind: 'user-dot',
+        },
+      },
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[tip, baseLeft, neck, baseRight, tip]],
+        },
+        properties: {
+          kind: 'user-heading',
+        },
+      },
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [coordinate, tip],
+        },
+        properties: {
+          kind: 'user-heading-line',
+        },
+      },
+    ],
+  };
+};
+
 const getLineStringDistanceMeters = (coordinates: unknown): number => {
   if (!Array.isArray(coordinates) || coordinates.length < 2) {
     return 0;
@@ -2250,6 +2437,7 @@ const Index = () => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(true);
   const [locationRetry, setLocationRetry] = useState(0);
   const [zoomLevel, setZoomLevel] = useState(15);
+  const [isNavigationMode, setIsNavigationMode] = useState(false);
   const [longPressProgress, setLongPressProgress] = useState(0);
   const longPressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const longPressStartTimeRef = useRef<number | null>(null);
@@ -2293,6 +2481,9 @@ const Index = () => {
   const isMapDraggingRef = useRef(false);
   const lastMapDragFinishedAtRef = useRef(0);
   const zoomLevelRef = useRef(15);
+  const isNavigationModeRef = useRef(false);
+  const navigationHeadingRef = useRef<number | null>(null);
+  const navigationCoordinateRef = useRef<[number, number] | null>(null);
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportText, setReportText] = useState('');
   const [reportLocation, setReportLocation] = useState<LocationData | null>(null);
@@ -2311,8 +2502,15 @@ const Index = () => {
   const SEARCH_RESULT_MIN_ZOOM_OUT_DELTA = 1;
   const SEARCH_RESULT_FLYTO_DURATION_MS = 800;
   const ZOOM_SYNC_EPSILON = 0.05;
+  const NAVIGATION_MIN_ZOOM = 16;
+  const NAVIGATION_PITCH = 48;
+  const NAVIGATION_HEADING_EPSILON = 2;
+  const NAVIGATION_POSITION_EPSILON_METERS = 0.8;
+  const NAVIGATION_CAMERA_ANIMATION_DURATION_MS = 220;
   const MAP_PRESS_AFTER_DRAG_BLOCK_MS = 650;
   const LONG_PRESS_DURATION = 5000; // 5 seconds
+
+  const effectiveHeading = userHeading;
 
   const clampZoomLevel = (value: number) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, value));
   const syncZoomLevel = (nextZoom: number) => {
@@ -2325,6 +2523,10 @@ const Index = () => {
   const setCenterCoordinateRef = (coordinate: [number, number]) => {
     centerCoordinateRef.current = coordinate;
   };
+
+  useEffect(() => {
+    isNavigationModeRef.current = isNavigationMode;
+  }, [isNavigationMode]);
 
   const handleActiveQueryChange = (text: string) => {
     if (activeSearchField === 'start') {
@@ -2472,9 +2674,36 @@ const Index = () => {
     if (location && cameraRef.current) {
       const coord: [number, number] = [location.longitude, location.latitude];
       setCenterCoordinateRef(coord);
+
+      if (isNavigationModeRef.current) {
+        isNavigationModeRef.current = false;
+        setIsNavigationMode(false);
+        navigationHeadingRef.current = null;
+        navigationCoordinateRef.current = null;
+        cameraRef.current.setCamera({
+          centerCoordinate: coord,
+          zoomLevel: zoomLevelRef.current,
+          heading: 0,
+          pitch: 0,
+          animationMode: 'easeTo',
+          animationDuration: 320,
+        });
+        return;
+      }
+
+      const nextHeading = normalizeHeadingDegrees(
+        effectiveHeading ?? navigationHeadingRef.current ?? 0
+      );
+      const targetZoom = syncZoomLevel(Math.max(zoomLevelRef.current, NAVIGATION_MIN_ZOOM));
+      isNavigationModeRef.current = true;
+      setIsNavigationMode(true);
+      navigationHeadingRef.current = nextHeading;
+      navigationCoordinateRef.current = coord;
       cameraRef.current.setCamera({
         centerCoordinate: coord,
-        zoomLevel: zoomLevelRef.current,
+        zoomLevel: targetZoom,
+        heading: nextHeading,
+        pitch: NAVIGATION_PITCH,
         animationMode: 'easeTo',
         animationDuration: 320,
       });
@@ -2658,6 +2887,53 @@ const Index = () => {
       headingSubscription?.remove();
     };
   }, [locationRetry]);
+
+  useEffect(() => {
+    if (!isNavigationModeRef.current || !location || !cameraRef.current) {
+      return;
+    }
+
+    const coordinate: [number, number] = [location.longitude, location.latitude];
+    const heading = normalizeHeadingDegrees(effectiveHeading ?? 0);
+    const previousHeading = navigationHeadingRef.current;
+    const previousCoordinate = navigationCoordinateRef.current;
+    const headingDelta =
+      previousHeading === null
+        ? Number.POSITIVE_INFINITY
+        : getHeadingDeltaDegrees(previousHeading, heading);
+    const movedMeters =
+      previousCoordinate === null
+        ? Number.POSITIVE_INFINITY
+        : getSegmentDistanceMeters(previousCoordinate, coordinate);
+
+    if (
+      headingDelta < NAVIGATION_HEADING_EPSILON &&
+      movedMeters < NAVIGATION_POSITION_EPSILON_METERS
+    ) {
+      return;
+    }
+
+    navigationHeadingRef.current = heading;
+    navigationCoordinateRef.current = coordinate;
+    setCenterCoordinateRef(coordinate);
+    cameraRef.current.setCamera({
+      centerCoordinate: coordinate,
+      zoomLevel: Math.max(zoomLevelRef.current, NAVIGATION_MIN_ZOOM),
+      heading,
+      pitch: NAVIGATION_PITCH,
+      animationMode: 'easeTo',
+      animationDuration: NAVIGATION_CAMERA_ANIMATION_DURATION_MS,
+    });
+  }, [
+    isNavigationMode,
+    location,
+    effectiveHeading,
+    NAVIGATION_CAMERA_ANIMATION_DURATION_MS,
+    NAVIGATION_HEADING_EPSILON,
+    NAVIGATION_MIN_ZOOM,
+    NAVIGATION_PITCH,
+    NAVIGATION_POSITION_EPSILON_METERS,
+  ]);
 
   const searchPlaces = async (query: string) => {
     const normalizedQuery = query.trim();
@@ -3402,6 +3678,13 @@ const Index = () => {
 
     if (location) {
       const initialCenter = centerCoordinateRef.current ?? [location.longitude, location.latitude];
+      const markerHeading = normalizeHeadingDegrees(effectiveHeading ?? 0);
+      const userLocationCoordinate: [number, number] = [location.longitude, location.latitude];
+      const userLocationFeatureCollection = buildUserLocationFeatureCollection(
+        userLocationCoordinate,
+        markerHeading
+      );
+      const userLocationSourceKey = `user-location-source-${userLocationCoordinate[0].toFixed(5)}-${userLocationCoordinate[1].toFixed(5)}-${Math.round(markerHeading)}`;
       return (
         <Mapbox.MapView
           style={styles.map}
@@ -3414,8 +3697,8 @@ const Index = () => {
           onMapIdle={handleMapIdle}
           zoomEnabled={!isMapInteractionLocked}
           scrollEnabled={!isMapInteractionLocked}
-          pitchEnabled={false}
-          rotateEnabled={false}
+          pitchEnabled={isNavigationMode}
+          rotateEnabled={isNavigationMode}
           compassEnabled={false}
           scaleBarEnabled
           scaleBarPosition={{ bottom: 20, left: 20 }}
@@ -3425,30 +3708,63 @@ const Index = () => {
             defaultSettings={{
               centerCoordinate: initialCenter as [number, number],
               zoomLevel: zoomLevelRef.current,
+              heading: 0,
+              pitch: 0,
             }}
             minZoomLevel={MIN_ZOOM}
             maxZoomLevel={MAX_ZOOM}
           />
-          <PointAnnotation
-            id="user-location"
-            coordinate={[location.longitude, location.latitude]}
-            title="Your Location"
+          <ShapeSource
+            key={userLocationSourceKey}
+            id="userLocationSource"
+            shape={userLocationFeatureCollection as any}
           >
-            <View collapsable={false} style={styles.userMarkerContainer}>
-              <View style={styles.userMarkerAccuracy} />
-              <View
-                style={[
-                  styles.userMarkerHeadingWrapper,
-                  { transform: [{ rotate: `${userHeading ?? 0}deg` }] },
-                ]}
-              >
-                <View style={styles.userMarkerHeadingTriangle} />
-              </View>
-              <View style={styles.userMarkerRing}>
-                <View style={styles.userMarkerDot} />
-              </View>
-            </View>
-          </PointAnnotation>
+            <CircleLayer
+              id="userLocationAccuracyHalo"
+              filter={['==', ['get', 'kind'], 'user-dot'] as any}
+              style={{
+                circleRadius: 14,
+                circleColor: 'rgba(37, 99, 235, 0.22)',
+                circleStrokeColor: 'rgba(147, 197, 253, 0.5)',
+                circleStrokeWidth: 1,
+              }}
+            />
+            <LineLayer
+              id="userLocationHeadingLine"
+              filter={['==', ['get', 'kind'], 'user-heading-line'] as any}
+              style={{
+                lineColor: '#2563EB',
+                lineWidth: 2.2,
+                lineOpacity: 0.95,
+              }}
+            />
+            <FillLayer
+              id="userLocationHeadingTriangle"
+              filter={['==', ['get', 'kind'], 'user-heading'] as any}
+              style={{
+                fillColor: '#2563EB',
+                fillOpacity: 0.95,
+              }}
+            />
+            <CircleLayer
+              id="userLocationRing"
+              filter={['==', ['get', 'kind'], 'user-dot'] as any}
+              style={{
+                circleRadius: 8.5,
+                circleColor: '#FFFFFF',
+                circleStrokeColor: '#2563EB',
+                circleStrokeWidth: 2,
+              }}
+            />
+            <CircleLayer
+              id="userLocationDot"
+              filter={['==', ['get', 'kind'], 'user-dot'] as any}
+              style={{
+                circleRadius: 3.5,
+                circleColor: '#2563EB',
+              }}
+            />
+          </ShapeSource>
           {routeData && (
             <ShapeSource id="routeSource" shape={routeData} onPress={handleRouteFeaturePress}>
               <LineLayer
@@ -3736,42 +4052,35 @@ const Index = () => {
         </Pressable>
       </Modal>
 
-      {/* SOS & Recenter Buttons */}
       {location && (
-        <View style={styles.topRightControls}>
-          <Pressable
-            style={({ pressed }) => [styles.sosButton, pressed && styles.sosButtonPressed]}
-            onPress={() => router.navigate('/alerts')}
-          >
-            <Text style={styles.sosButtonText}>SOS</Text>
-          </Pressable>
-          <Pressable
-            style={({ pressed }) => [styles.locationButton, pressed && { opacity: 0.85 }]}
+        <View style={styles.mapControlsContainer} pointerEvents="box-none">
+          <TouchableOpacity
+            style={[styles.controlRoundButton, isNavigationMode && styles.controlRoundButtonActive]}
             onPress={handleCenterOnLocation}
           >
-            <Text style={{ fontSize: 20 }}>📍</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {/* Zoom Controls */}
-      {location && (
-        <View style={styles.zoomControlsFixed}>
-          <TouchableOpacity
-            style={[styles.zoomButton, zoomLevel >= MAX_ZOOM && styles.zoomButtonDisabled]}
-            onPress={handleZoomIn}
-            disabled={zoomLevel >= MAX_ZOOM}
-          >
-            <Text style={styles.zoomButtonText}>+</Text>
+            {isNavigationMode ? (
+              <NavigationModeIcon color="#FFFFFF" />
+            ) : (
+              <CenterLocationIcon color="#2563EB" />
+            )}
           </TouchableOpacity>
-          <View style={styles.zoomDivider} />
-          <TouchableOpacity
-            style={[styles.zoomButton, zoomLevel <= MIN_ZOOM && styles.zoomButtonDisabled]}
-            onPress={handleZoomOut}
-            disabled={zoomLevel <= MIN_ZOOM}
-          >
-            <Text style={styles.zoomButtonText}>−</Text>
-          </TouchableOpacity>
+          <View style={styles.zoomControls}>
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomIn}
+              disabled={zoomLevel >= MAX_ZOOM}
+            >
+              <Text style={styles.zoomButtonText}>+</Text>
+            </TouchableOpacity>
+            <View style={styles.zoomDivider} />
+            <TouchableOpacity
+              style={styles.zoomButton}
+              onPress={handleZoomOut}
+              disabled={zoomLevel <= MIN_ZOOM}
+            >
+              <Text style={styles.zoomButtonText}>−</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 

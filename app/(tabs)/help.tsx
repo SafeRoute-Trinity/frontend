@@ -32,19 +32,6 @@ const recaptchaModule: { default?: any } | null = (() => {
 const RecaptchaView = recaptchaModule?.default ?? null;
 const IS_RECAPTCHA_AVAILABLE = Boolean(RecaptchaView);
 
-type RecaptchaRef = { open: () => void };
-
-const recaptchaModule: { default?: any } | null = (() => {
-  try {
-    return require('react-native-recaptcha-that-works');
-  } catch {
-    return null;
-  }
-})();
-
-const RecaptchaView = recaptchaModule?.default ?? null;
-const IS_RECAPTCHA_AVAILABLE = Boolean(RecaptchaView);
-
 // TODO: Replace with your actual reCAPTCHA v2 site key from https://www.google.com/recaptcha/admin
 const RECAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY!;
 
@@ -268,6 +255,7 @@ const HelpMenuItem = ({ icon, title, subtitle, onPress }: IHelpMenuItem) => (
 
 const Help = () => {
   const router = useRouter();
+  const { user } = useAuth0();
   const recaptchaRef = useRef<RecaptchaRef | null>(null);
   // const [showHelpModal, setShowHelpModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
