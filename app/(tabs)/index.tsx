@@ -24,6 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { checkHighRiskAlert, type HighRiskAlertResponse } from '../../api/high-risk-alert';
 import { coreEndpoints } from '../../config/core-endpoints';
 import { initializeMapbox, mapboxConfig } from '../../config/mapbox';
 import { useAuth0 } from '../../contexts/Auth0Context';
@@ -42,61 +43,8 @@ if (MAPBOX_ACCESS_TOKEN) {
 const FEEDBACK_SUBMIT_URL =
   coreEndpoints.feedbackSubmitUrl || 'http://127.0.0.1:20004/v1/feedback/submit';
 
-const ensureHttpsForRemote = (url: string) => {
-  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
-    return url;
-  }
-  return url.replace(/^http:\/\//, 'https://');
-};
-
-const getServiceBaseUrlFromHealthUrl = (healthUrl: string) => {
-  const normalized = ensureHttpsForRemote(healthUrl).replace(/\/$/, '');
-  return normalized.replace(/\/health(?:\/[^/]+)?$/, '');
-};
-
-const buildRouteApiUrlFromHealth = (healthUrl?: string) => {
-  if (!healthUrl) {
-    return null;
-  }
-  const baseUrl = getServiceBaseUrlFromHealthUrl(healthUrl);
-  return `${baseUrl}/v1/routes/calculate`;
-};
-
-const buildTransitApiUrlFromHealth = (healthUrl?: string) => {
-  if (!healthUrl) {
-    return null;
-  }
-  const baseUrl = getServiceBaseUrlFromHealthUrl(healthUrl);
-  return `${baseUrl}/v1/transit/plan`;
-};
-
-const routingHealthUrl = coreEndpoints.routingServiceHealthUrl;
-const derivedRoutingCalculateUrl = buildRouteApiUrlFromHealth(routingHealthUrl);
-const derivedTransitPlanUrl = buildTransitApiUrlFromHealth(routingHealthUrl);
-
-const ROUTE_API_URL =
-  derivedRoutingCalculateUrl ||
-  (coreEndpoints.backendBaseUrl
-    ? `${ensureHttpsForRemote(coreEndpoints.backendBaseUrl).replace(/\/$/, '')}/v1/routes/calculate`
-    : 'http://127.0.0.1:20003/api/route');
-const USE_V1_ROUTE_API = ROUTE_API_URL.includes('/v1/routes/calculate');
-const buildTransitApiCandidates = () => {
-  const backendTransitUrl = coreEndpoints.backendBaseUrl
-    ? `${ensureHttpsForRemote(coreEndpoints.backendBaseUrl).replace(/\/$/, '')}/v1/transit/plan`
-    : null;
-
-  const candidates = [
-    'http://127.0.0.1:20002/v1/transit/plan',
-    coreEndpoints.transitPlanUrl,
-    derivedTransitPlanUrl,
-    backendTransitUrl,
-    'http://127.0.0.1:20003/v1/transit/plan',
-  ].filter((item): item is string => Boolean(item));
-
-  return Array.from(new Set(candidates));
-};
-
-const TRANSIT_API_CANDIDATES = buildTransitApiCandidates();
+const ROUTE_API_URL = 'http://10.0.2.2:20002/v1/routes/calculate';
+const USE_V1_ROUTE_API = true;
 
 interface LocationData {
   latitude: number;
@@ -157,6 +105,9 @@ interface SelectedRouteSegment {
 
 const RECENT_DESTINATIONS_STORAGE_KEY = 'recent_destinations_v1';
 const CURRENT_LOCATION_RESULT_ID = 'local-current-location';
+const HIGH_RISK_ALERT_TITLE = 'High-Risk Area Alert';
+const HIGH_RISK_BANNER_MESSAGE = 'You are entering a high-risk area. Please stay alert.';
+const HIGH_RISK_ALERT_RADIUS_METERS = 30;
 
 const isSearchResult = (value: unknown): value is SearchResult => {
   if (!value || typeof value !== 'object') {
@@ -546,6 +497,35 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     padding: 4,
     borderRadius: 4,
+  },
+  riskZoneStatusBanner: {
+    position: 'absolute',
+    top: 156,
+    left: 16,
+    right: 16,
+    zIndex: 1000,
+    backgroundColor: 'rgba(127, 29, 29, 0.9)',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(254, 202, 202, 0.35)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  riskZoneStatusBannerSafe: {
+    backgroundColor: 'rgba(15, 23, 42, 0.88)',
+    borderColor: 'rgba(148, 163, 184, 0.35)',
+  },
+  riskZoneStatusBannerAlert: {
+    backgroundColor: 'rgba(127, 29, 29, 0.92)',
+    borderColor: 'rgba(254, 202, 202, 0.35)',
+  },
+  riskZoneStatusText: {
+    color: '#FEE2E2',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  riskZoneStatusTextSafe: {
+    color: '#E2E8F0',
   },
   mapControlsContainer: {
     position: 'absolute',
@@ -1167,6 +1147,60 @@ const extractHeadingDegrees = (heading: Location.LocationHeadingObject): number 
   return null;
 };
 
+const formatRouteApiErrorValue = (value: unknown): string | null => {
+  if (value == null) {
+    return null;
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  }
+
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return String(value);
+  }
+
+  if (Array.isArray(value)) {
+    const parts = value
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return formatRouteApiErrorValue(item);
+        }
+
+        const record = item as Record<string, unknown>;
+        const loc = Array.isArray(record.loc)
+          ? record.loc.map((segment) => String(segment)).join('.')
+          : null;
+        const msg = formatRouteApiErrorValue(record.msg);
+        const detail = formatRouteApiErrorValue(record.detail);
+        const message = formatRouteApiErrorValue(record.message);
+        const fallback = formatRouteApiErrorValue(record.errors);
+
+        if (loc && (msg || detail || message)) {
+          return `${loc}: ${msg || detail || message}`;
+        }
+
+        return msg || detail || message || fallback;
+      })
+      .filter((item): item is string => Boolean(item));
+
+    return parts.length > 0 ? parts.join(' | ') : null;
+  }
+
+  if (typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    return (
+      formatRouteApiErrorValue(record.detail) ||
+      formatRouteApiErrorValue(record.message) ||
+      formatRouteApiErrorValue(record.errors) ||
+      null
+    );
+  }
+
+  return null;
+};
+
 const DUBLIN_BBOX = {
   minLongitude: -6.65,
   minLatitude: 53.12,
@@ -1695,6 +1729,14 @@ type MapboxRouteResult = {
   distanceMeters: number;
 };
 
+type NormalizedRoutingResult = {
+  coordinates: [number, number][];
+  distanceMeters: number | null;
+  durationSeconds: number | null;
+  routeId: string;
+  safetyScore: number | null;
+};
+
 const fetchMapboxDirectionsRoute = async (
   start: [number, number],
   end: [number, number]
@@ -1879,7 +1921,7 @@ const sanitizeRouteCoordinates = (inputCoordinates: [number, number][]): [number
   return revisitCollapsed;
 };
 
-const extractCoordinatesFromRouteGeometry = (geometryPayload: unknown): [number, number][] => {
+function extractCoordinatesFromRouteGeometry(geometryPayload: unknown): [number, number][] {
   let parsed: any = geometryPayload;
 
   if (typeof geometryPayload === 'string') {
@@ -1949,7 +1991,7 @@ const extractCoordinatesFromRouteGeometry = (geometryPayload: unknown): [number,
   }
 
   return [];
-};
+}
 
 const getTransitLegCoordinates = (leg: TransitLeg): [number, number][] => {
   if (!Array.isArray(leg.coordinates)) {
@@ -2390,7 +2432,7 @@ const getTransitStepDetail = (step: TransitJourneyStep): string => {
   return distanceLabel ? `${fromStop} -> ${toStop} · ${distanceLabel}` : `${fromStop} -> ${toStop}`;
 };
 
-const getNumberFromProperty = (value: unknown): number | null => {
+function getNumberFromProperty(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
@@ -2401,13 +2443,98 @@ const getNumberFromProperty = (value: unknown): number | null => {
     }
   }
   return null;
-};
+}
 
-const getStringFromProperty = (value: unknown): string | null => {
+function getStringFromProperty(value: unknown): string | null {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value;
   }
   return null;
+}
+
+const normalizeRoutingResponse = (data: any): NormalizedRoutingResult | null => {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
+    const coordinates = extractCoordinatesFromRouteGeometry(data);
+    if (coordinates.length < 2) {
+      return null;
+    }
+
+    return {
+      coordinates,
+      distanceMeters:
+        getNumberFromProperty(data?.properties?.summary?.distance_meters) ??
+        getNumberFromProperty(data?.summary?.distance_meters),
+      durationSeconds:
+        getNumberFromProperty(data?.properties?.summary?.duration_seconds) ??
+        getNumberFromProperty(data?.summary?.duration_seconds),
+      routeId: getStringFromProperty(data?.route_id) || '',
+      safetyScore: getNumberFromProperty(data?.safety_score),
+    };
+  }
+
+  const primaryRoute =
+    Array.isArray(data?.routes) && data.routes.length > 0
+      ? data.routes.find((route: any) => route.is_primary) || data.routes[0]
+      : data;
+
+  const coordinates = extractCoordinatesFromRouteGeometry(
+    primaryRoute?.geometry ?? primaryRoute?.route_geometry ?? primaryRoute?.path ?? data?.geometry
+  );
+
+  if (coordinates.length < 2) {
+    const waypoints = Array.isArray(primaryRoute?.waypoints) ? primaryRoute.waypoints : [];
+    const waypointCoordinates = waypoints
+      .filter((wp: any) => typeof wp?.lon === 'number' && typeof wp?.lat === 'number')
+      .map((wp: any) => [wp.lon, wp.lat] as [number, number]);
+
+    if (waypointCoordinates.length < 2) {
+      return null;
+    }
+
+    return {
+      coordinates: waypointCoordinates,
+      distanceMeters:
+        getNumberFromProperty(primaryRoute?.distance_m) ??
+        getNumberFromProperty(primaryRoute?.distance) ??
+        getNumberFromProperty(data?.distance_m) ??
+        getNumberFromProperty(data?.distance),
+      durationSeconds:
+        getNumberFromProperty(primaryRoute?.duration_s) ??
+        getNumberFromProperty(primaryRoute?.duration) ??
+        getNumberFromProperty(data?.duration_s) ??
+        getNumberFromProperty(data?.duration),
+      routeId:
+        getStringFromProperty(primaryRoute?.route_id) ||
+        getStringFromProperty(data?.route_id) ||
+        '',
+      safetyScore:
+        getNumberFromProperty(primaryRoute?.safety_score) ??
+        getNumberFromProperty(data?.safety_score),
+    };
+  }
+
+  return {
+    coordinates,
+    distanceMeters:
+      getNumberFromProperty(primaryRoute?.distance_m) ??
+      getNumberFromProperty(primaryRoute?.distance) ??
+      getNumberFromProperty(data?.distance_m) ??
+      getNumberFromProperty(data?.distance),
+    durationSeconds:
+      getNumberFromProperty(primaryRoute?.duration_s) ??
+      getNumberFromProperty(primaryRoute?.duration) ??
+      getNumberFromProperty(data?.duration_s) ??
+      getNumberFromProperty(data?.duration),
+    routeId:
+      getStringFromProperty(primaryRoute?.route_id) || getStringFromProperty(data?.route_id) || '',
+    safetyScore:
+      getNumberFromProperty(primaryRoute?.safety_score) ??
+      getNumberFromProperty(data?.safety_score),
+  };
 };
 
 const buildSelectedRouteSegment = (properties: Record<string, unknown>): SelectedRouteSegment => {
@@ -2528,6 +2655,12 @@ const Index = () => {
   >(null);
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [isHighRiskArea, setIsHighRiskArea] = useState(false);
+  const [isCheckingHighRisk, setIsCheckingHighRisk] = useState(false);
+  const [highRiskStatusText, setHighRiskStatusText] = useState('Waiting for your location...');
+  const activeDangerZoneIdsRef = useRef<string[]>([]);
+  const isInsideHighRiskAreaRef = useRef(false);
+  const highRiskRequestIdRef = useRef(0);
   const { user } = useAuth0();
 
   const MIN_ZOOM = 3;
@@ -2815,6 +2948,27 @@ const Index = () => {
   }, [recentDestinations, recentDestinationsLoaded]);
 
   useEffect(() => {
+    if (isLoadingLocation) {
+      setHighRiskStatusText('Getting your location...');
+      return;
+    }
+
+    if (locationError) {
+      setHighRiskStatusText(`Location unavailable: ${locationError}.`);
+      return;
+    }
+
+    if (!location) {
+      setHighRiskStatusText('Waiting for your location...');
+      return;
+    }
+
+    if (isCheckingHighRisk) {
+      setHighRiskStatusText('Checking nearby high-risk roads...');
+    }
+  }, [isCheckingHighRisk, isLoadingLocation, location, locationError]);
+
+  useEffect(() => {
     let mounted = true;
     let positionSubscription: Location.LocationSubscription | null = null;
     let headingSubscription: Location.LocationSubscription | null = null;
@@ -3045,6 +3199,85 @@ const Index = () => {
     };
   }, [deferredActiveQuery, isDestinationOverlayVisible]);
 
+  useEffect(() => {
+    if (!location) {
+      return undefined;
+    }
+
+    let isCancelled = false;
+    const requestId = highRiskRequestIdRef.current + 1;
+    highRiskRequestIdRef.current = requestId;
+    setIsCheckingHighRisk(true);
+
+    const buildRiskStatusText = (payload: HighRiskAlertResponse) => {
+      if (!payload.in_high_risk_area || payload.matches.length === 0) {
+        return `No high-risk area detected within ${payload.radius_m}m.`;
+      }
+
+      const nearestDistance = Math.min(...payload.matches.map((match) => match.distance_m));
+      return `High-risk area detected within ${payload.radius_m}m. ${payload.matches.length} nearby segment(s), nearest ${nearestDistance.toFixed(1)}m.`;
+    };
+
+    const runHighRiskCheck = async () => {
+      try {
+        const result = await checkHighRiskAlert({
+          lat: location.latitude,
+          lng: location.longitude,
+          radius_m: HIGH_RISK_ALERT_RADIUS_METERS,
+        });
+
+        if (isCancelled || highRiskRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        const nextZoneIds = result.matches.map((match) => String(match.id));
+        const previousZoneIds = activeDangerZoneIdsRef.current;
+        const wasInsideHighRiskArea = isInsideHighRiskAreaRef.current;
+        const isInsideHighRiskArea = result.in_high_risk_area;
+
+        if (!wasInsideHighRiskArea && isInsideHighRiskArea) {
+          console.log('[HighRiskAlert] entered high-risk area', {
+            location,
+            enteredZoneIds: nextZoneIds,
+          });
+          Alert.alert(HIGH_RISK_ALERT_TITLE, HIGH_RISK_BANNER_MESSAGE);
+        }
+
+        if (wasInsideHighRiskArea && !isInsideHighRiskArea) {
+          console.log('[HighRiskAlert] left high-risk area', {
+            location,
+            exitedZoneIds: previousZoneIds,
+          });
+        }
+
+        setIsHighRiskArea(isInsideHighRiskArea);
+        setHighRiskStatusText(buildRiskStatusText(result));
+        activeDangerZoneIdsRef.current = nextZoneIds;
+        isInsideHighRiskAreaRef.current = isInsideHighRiskArea;
+        setIsCheckingHighRisk(false);
+      } catch (error) {
+        if (isCancelled || highRiskRequestIdRef.current !== requestId) {
+          return;
+        }
+
+        console.warn('[HighRiskAlert] failed to check current location', error);
+        setIsHighRiskArea(false);
+        setHighRiskStatusText(
+          error instanceof Error
+            ? error.message
+            : 'High-risk monitoring is temporarily unavailable.'
+        );
+        setIsCheckingHighRisk(false);
+      }
+    };
+
+    runHighRiskCheck();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [location]);
+
   async function handleGetRoute(
     destinationOverride?: [number, number],
     modeOverride?: TransportMode,
@@ -3059,7 +3292,21 @@ const Index = () => {
       startOverride ?? routeStart ?? (location ? [location.longitude, location.latitude] : null);
     const endCoord = destinationOverride ?? routeEnd;
 
+    console.log('[Routing] handleGetRoute called', {
+      transportMode,
+      startOverride,
+      destinationOverride,
+      routeStart,
+      routeEnd,
+      resolvedStart: startCoord,
+      resolvedDestination: endCoord,
+    });
+
     if (!startCoord || !endCoord) {
+      console.log('[Routing] skipped request because start or destination is missing', {
+        resolvedStart: startCoord,
+        resolvedDestination: endCoord,
+      });
       setRouteError('Please select both start and end locations');
       return;
     }
@@ -3076,108 +3323,7 @@ const Index = () => {
       setTransitItinerary(null);
 
       const fetchAndSetWalkingRoute = async () => {
-        const payload = USE_V1_ROUTE_API
-          ? {
-              origin: {
-                lat: startCoord[1],
-                lon: startCoord[0],
-              },
-              destination: {
-                lat: endCoord[1],
-                lon: endCoord[0],
-              },
-              user_id: user?.sub || 'anonymous-user',
-              preferences: {
-                optimize_for: 'balanced',
-                transport_mode: 'walking',
-              },
-            }
-          : {
-              start: {
-                lat: startCoord[1],
-                lng: startCoord[0],
-              },
-              end: {
-                lat: endCoord[1],
-                lng: endCoord[0],
-              },
-            };
-
-        console.log('Routing via URL:', ROUTE_API_URL);
-        const response = await fetch(ROUTE_API_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const errorText = await response.text().catch(() => response.statusText);
-          let errorDetail = errorText;
-          try {
-            const errJson = JSON.parse(errorText);
-            if (errJson.detail) {
-              errorDetail = errJson.detail;
-            }
-          } catch {
-            // Keep plain-text error.
-          }
-          throw new Error(`${errorDetail || response.statusText}`);
-        }
-
-        const data = await response.json();
-
-        if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
-          setRouteData(withTransportModeInRouteData(data, 'walking'));
-          return;
-        }
-
-        if (Array.isArray(data?.routes) && data.routes.length > 0) {
-          const primaryRoute = data.routes.find((route: any) => route.is_primary) || data.routes[0];
-          const geometryCoordinates = extractCoordinatesFromRouteGeometry(primaryRoute?.geometry);
-          const waypoints = Array.isArray(primaryRoute?.waypoints) ? primaryRoute.waypoints : [];
-          const waypointCoordinates = waypoints
-            .filter((wp: any) => typeof wp?.lon === 'number' && typeof wp?.lat === 'number')
-            .map((wp: any) => [wp.lon, wp.lat]);
-          const shouldFallbackToMapbox = geometryCoordinates.length < 2;
-          const mapboxRoute = shouldFallbackToMapbox
-            ? await fetchMapboxDirectionsRoute(startCoord, endCoord)
-            : null;
-          let coordinates = geometryCoordinates;
-          if (coordinates.length < 2) {
-            if (Array.isArray(mapboxRoute?.coordinates) && mapboxRoute.coordinates.length >= 2) {
-              coordinates = mapboxRoute.coordinates;
-            } else {
-              coordinates = waypointCoordinates;
-            }
-          }
-
-          if (coordinates.length < 2) {
-            throw new Error('Route response does not include enough waypoint coordinates');
-          }
-
-          setRouteData(
-            withTransportModeInRouteData(
-              createRouteFeatureCollection(coordinates, {
-                route_id: data.route_id || '',
-                distance_m: primaryRoute.distance_m ?? mapboxRoute?.distanceMeters,
-                duration_s: primaryRoute.duration_s ?? mapboxRoute?.durationSeconds,
-                safety_score: primaryRoute.safety_score,
-                source: 'saferoute_algorithm',
-                transport_mode: 'walking',
-              }),
-              'walking'
-            )
-          );
-          return;
-        }
-
-        throw new Error('Unexpected route response format');
-      };
-
-      if (transportMode === 'public_transit') {
-        const transitPayload = {
+        const payload = {
           origin: {
             lat: startCoord[1],
             lon: startCoord[0],
@@ -3186,113 +3332,105 @@ const Index = () => {
             lat: endCoord[1],
             lon: endCoord[0],
           },
-          departure_time: new Date().toISOString(),
-          max_walking_distance_m: 1200,
-          max_transfers: 4,
-          search_window_minutes: 180,
+          user_id: user?.sub || 'anonymous',
+          preferences: {
+            transport_mode: 'walking',
+            optimize_for: 'safety',
+          },
         };
 
-        const requestTransitWithFallback = async (
-          candidates: string[],
-          index = 0,
-          previousReason = ''
-        ): Promise<TransitPlanResponse> => {
-          if (index >= candidates.length) {
-            const tried = candidates.join(', ');
-            const reasonSuffix = previousReason ? ` ${previousReason}` : '';
-            throw new Error(
-              `Public transit service unavailable. Tried: ${tried}.${reasonSuffix}`.trim()
-            );
-          }
+        console.log('Routing via URL:', ROUTE_API_URL);
+        console.log('[Routing] request body', payload);
+        const response = await fetch(ROUTE_API_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload),
+        });
 
-          const transitUrl = candidates[index];
-          try {
-            console.log('Transit planning via URL:', transitUrl);
-            const response = await fetch(transitUrl, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(transitPayload),
-            });
+        console.log('[Routing] response.status', response.status);
+        console.log('[Routing] response.ok', response.ok);
 
-            if (response.ok) {
-              return (await response.json()) as TransitPlanResponse;
-            }
+        const responseClone = response.clone();
+        const data = await response.json().catch(async () => {
+          const rawText = await responseClone.text().catch(() => '');
+          return rawText || null;
+        });
+        console.log('[Routing] response body', data);
 
-            const errorText = await response.text().catch(() => response.statusText);
-            let errorDetail = errorText;
-            try {
-              const errJson = JSON.parse(errorText);
-              if (errJson.detail) {
-                errorDetail = errJson.detail;
-              }
-            } catch {
-              // Keep plain-text error.
-            }
+        if (!response.ok) {
+          const errorDetail =
+            formatRouteApiErrorValue(
+              typeof data === 'object' && data !== null ? (data as Record<string, unknown>) : data
+            ) ||
+            response.statusText ||
+            `HTTP ${response.status}`;
 
-            if (response.status === 404 || response.status >= 500) {
-              const currentReason = `(${response.status}) ${errorDetail || response.statusText}`;
-              console.warn(
-                `Transit endpoint unavailable at ${transitUrl}, trying fallback. Reason:`,
-                currentReason
-              );
-              return await requestTransitWithFallback(candidates, index + 1, currentReason);
-            }
+          console.warn('[Routing] route API error detail', {
+            status: response.status,
+            ok: response.ok,
+            detail:
+              typeof data === 'object' && data !== null
+                ? {
+                    detail: (data as Record<string, unknown>).detail,
+                    message: (data as Record<string, unknown>).message,
+                    errors: (data as Record<string, unknown>).errors,
+                  }
+                : data,
+          });
 
-            throw new Error(`${errorDetail || response.statusText}`);
-          } catch (error) {
-            const currentReason = error instanceof Error ? error.message : String(error);
-            console.warn(
-              `Transit request failed at ${transitUrl}, trying fallback. Reason:`,
-              currentReason
-            );
-            return requestTransitWithFallback(candidates, index + 1, currentReason);
-          }
-        };
+          throw new Error(errorDetail);
+        }
 
-        let transitData: TransitPlanResponse;
-        try {
-          transitData = await requestTransitWithFallback(TRANSIT_API_CANDIDATES);
-        } catch {
-          await fetchAndSetWalkingRoute();
-          setRouteError('Public transit is unavailable right now. Showing walking route instead.');
+        if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
+          console.log('[Routing] received FeatureCollection response');
+          setRouteData(withTransportModeInRouteData(data, 'walking'));
           return;
         }
 
-        const primaryItinerary = transitData.itineraries?.[0];
-        if (!primaryItinerary) {
-          await fetchAndSetWalkingRoute();
-          setRouteError(
-            'No public transit itinerary found for this destination. Showing walking route.'
-          );
-          return;
+        const normalizedRoute = normalizeRoutingResponse(data);
+        const mapboxRoute =
+          !normalizedRoute || normalizedRoute.coordinates.length < 2
+            ? await fetchMapboxDirectionsRoute(startCoord, endCoord)
+            : null;
+        const coordinates =
+          normalizedRoute && normalizedRoute.coordinates.length >= 2
+            ? normalizedRoute.coordinates
+            : (mapboxRoute?.coordinates ?? []);
+
+        if (coordinates.length < 2) {
+          console.log('[Routing] response format mismatch', {
+            expected: 'FeatureCollection or object with routes/geometry/path/waypoints',
+            receivedKeys: data && typeof data === 'object' ? Object.keys(data) : [],
+          });
+          throw new Error('Route response does not include usable coordinates');
         }
 
-        setTransitItinerary(primaryItinerary);
+        const nextRouteData = withTransportModeInRouteData(
+          createRouteFeatureCollection(coordinates, {
+            route_id: normalizedRoute?.routeId || '',
+            distance_m: normalizedRoute?.distanceMeters ?? mapboxRoute?.distanceMeters,
+            duration_s: normalizedRoute?.durationSeconds ?? mapboxRoute?.durationSeconds,
+            safety_score: normalizedRoute?.safetyScore ?? null,
+            source: 'saferoute_algorithm',
+            transport_mode: 'walking',
+          }),
+          'walking'
+        );
 
-        const segmentedTransitRoute = createTransitFeatureCollectionFromItinerary(primaryItinerary);
-        if (segmentedTransitRoute) {
-          setRouteData(withTransportModeInRouteData(segmentedTransitRoute, 'public_transit'));
-        } else {
-          const previewRoute = await fetchMapboxDirectionsRoute(startCoord, endCoord);
-          if (previewRoute && previewRoute.coordinates.length >= 2) {
-            setRouteData(
-              withTransportModeInRouteData(
-                createRouteFeatureCollection(previewRoute.coordinates, {
-                  mode: 'transit_preview',
-                  transport_mode: 'public_transit',
-                  duration_s: primaryItinerary.duration_s,
-                  distance_m: previewRoute.distanceMeters,
-                }),
-                'public_transit'
-              )
-            );
-          } else {
-            await fetchAndSetWalkingRoute();
-            setRouteError('Transit geometry unavailable. Showing walking route.');
-          }
-        }
+        console.log('[Routing] writing routeData', {
+          coordinateCount: coordinates.length,
+          distance_m: normalizedRoute?.distanceMeters ?? mapboxRoute?.distanceMeters ?? null,
+          duration_s: normalizedRoute?.durationSeconds ?? mapboxRoute?.durationSeconds ?? null,
+        });
+        setRouteData(nextRouteData);
+      };
+
+      if (transportMode === 'public_transit') {
+        setSelectedTransportMode('walking');
+        await fetchAndSetWalkingRoute();
+        setRouteError('Public Transit is temporarily unavailable. Showing walking route instead.');
       } else {
         await fetchAndSetWalkingRoute();
       }
@@ -3309,7 +3447,11 @@ const Index = () => {
       }
     } catch (error) {
       console.warn('Route API warning:', error);
-      setRouteError(error instanceof Error ? error.message : 'Failed to calculate route');
+      const nextRouteError =
+        error instanceof Error
+          ? error.message
+          : formatRouteApiErrorValue(error) || 'Failed to calculate route';
+      setRouteError(nextRouteError);
     } finally {
       setIsLoadingRoute(false);
     }
@@ -3395,9 +3537,32 @@ const Index = () => {
   };
 
   const handleTransportModeChange = (mode: TransportMode) => {
-    if (mode === selectedTransportMode) {
+    console.log('[Routing] transport mode pressed', {
+      mode,
+      selectedTransportMode,
+      routeStart,
+      routeEnd,
+    });
+
+    if (mode === 'public_transit') {
+      setSelectedTransportMode('walking');
+      setRouteError('Public Transit is temporarily unavailable.');
       return;
     }
+
+    if (mode === selectedTransportMode) {
+      if (mode === 'walking' && routeEnd) {
+        console.log('[Routing] re-trigger walking route from Walking button', {
+          routeStart,
+          routeEnd,
+        });
+        handleGetRoute(routeEnd, mode).catch((error) => {
+          console.warn('Failed to recalculate route after pressing walking', error);
+        });
+      }
+      return;
+    }
+
     setSelectedTransportMode(mode);
     if (routeEnd) {
       handleGetRoute(routeEnd, mode).catch((error) => {
@@ -3475,6 +3640,11 @@ const Index = () => {
     }
 
     if (activeSearchField === 'start') {
+      console.log('[Routing] search result selected for start', {
+        place: result.place_name,
+        selectedLocation: coord,
+        currentDestination: routeEnd,
+      });
       setRouteStart(coord);
       setStartQuery(isCurrentLocationSelection ? 'Current location' : result.place_name);
       if (routeEnd) {
@@ -3483,7 +3653,19 @@ const Index = () => {
       return;
     }
 
+    console.log('[Routing] search result selected for destination', {
+      place: result.place_name,
+      selectedLocation: coord,
+      previousDestination: routeEnd,
+      currentLocation: location,
+    });
+    if (!routeStart && location) {
+      setRouteStart([location.longitude, location.latitude]);
+    }
     setRouteEnd(coord);
+    console.log('[Routing] triggering route request after destination selection', {
+      selectedLocation: coord,
+    });
     setDestQuery(isCurrentLocationSelection ? 'Current location' : result.place_name);
     if (!isCurrentLocationSelection) {
       setRecentDestinations((prev) => {
@@ -3665,6 +3847,17 @@ const Index = () => {
     isDestinationOverlayVisible || isMapPointModalVisible || showReportModal;
   const plannerMainContent = (() => {
     if (selectedTransportMode === 'walking') {
+      if (isLoadingRoute) {
+        return <Text style={styles.plannerEmptyText}>Calculating walking route...</Text>;
+      }
+      if (routeEnd && routeError) {
+        return <Text style={styles.plannerEmptyText}>Unable to render route summary yet.</Text>;
+      }
+      if (routeEnd && !routeData) {
+        return (
+          <Text style={styles.plannerEmptyText}>Destination selected. Waiting for route...</Text>
+        );
+      }
       if (!routeData) {
         return (
           <Text style={styles.plannerEmptyText}>
@@ -4001,6 +4194,17 @@ const Index = () => {
         </Pressable>
       </View>
 
+      <View
+        style={[
+          styles.riskZoneStatusBanner,
+          isHighRiskArea ? styles.riskZoneStatusBannerAlert : styles.riskZoneStatusBannerSafe,
+        ]}
+      >
+        <Text style={[styles.riskZoneStatusText, !isHighRiskArea && styles.riskZoneStatusTextSafe]}>
+          {isHighRiskArea ? HIGH_RISK_BANNER_MESSAGE : highRiskStatusText}
+        </Text>
+      </View>
+
       <View style={styles.searchWrapper}>
         {hasPlannedRoute ? (
           <View style={styles.routeInputsRow}>
@@ -4094,21 +4298,11 @@ const Index = () => {
                 </Text>
               </Pressable>
               <Pressable
-                style={[
-                  styles.transportModeButton,
-                  selectedTransportMode === 'public_transit' && styles.transportModeButtonActive,
-                ]}
+                disabled
+                style={[styles.transportModeButton, { opacity: 0.45 }]}
                 onPress={() => handleTransportModeChange('public_transit')}
               >
-                <Text
-                  style={[
-                    styles.transportModeButtonText,
-                    selectedTransportMode === 'public_transit' &&
-                      styles.transportModeButtonTextActive,
-                  ]}
-                >
-                  Public Transit
-                </Text>
+                <Text style={styles.transportModeButtonText}>Public Transit</Text>
               </Pressable>
             </View>
 
