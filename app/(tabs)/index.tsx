@@ -1855,7 +1855,7 @@ const sanitizeRouteCoordinates = (inputCoordinates: [number, number][]): [number
   return revisitCollapsed;
 };
 
-const extractCoordinatesFromRouteGeometry = (geometryPayload: unknown): [number, number][] => {
+function extractCoordinatesFromRouteGeometry(geometryPayload: unknown): [number, number][] {
   let parsed: any = geometryPayload;
 
   if (typeof geometryPayload === 'string') {
@@ -1925,7 +1925,7 @@ const extractCoordinatesFromRouteGeometry = (geometryPayload: unknown): [number,
   }
 
   return [];
-};
+}
 
 const getTransitLegCoordinates = (leg: TransitLeg): [number, number][] => {
   if (!Array.isArray(leg.coordinates)) {
@@ -2294,7 +2294,7 @@ const getTransitStepDetail = (step: TransitJourneyStep): string => {
   return distanceLabel ? `${fromStop} -> ${toStop} · ${distanceLabel}` : `${fromStop} -> ${toStop}`;
 };
 
-const getNumberFromProperty = (value: unknown): number | null => {
+function getNumberFromProperty(value: unknown): number | null {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return value;
   }
@@ -2305,14 +2305,14 @@ const getNumberFromProperty = (value: unknown): number | null => {
     }
   }
   return null;
-};
+}
 
-const getStringFromProperty = (value: unknown): string | null => {
+function getStringFromProperty(value: unknown): string | null {
   if (typeof value === 'string' && value.trim().length > 0) {
     return value;
   }
   return null;
-};
+}
 
 const buildSelectedRouteSegment = (properties: Record<string, unknown>): SelectedRouteSegment => {
   const featureId = getStringFromProperty(properties.feature_id) || 'feature-0';
