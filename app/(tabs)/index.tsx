@@ -1650,91 +1650,6 @@ const createRouteFeatureCollection = (
   ],
 });
 
-const normalizeRoutingResponse = (data: any): NormalizedRoutingResult | null => {
-  if (!data || typeof data !== 'object') {
-    return null;
-  }
-
-  if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
-    const coordinates = extractCoordinatesFromRouteGeometry(data);
-    if (coordinates.length < 2) {
-      return null;
-    }
-
-    return {
-      coordinates,
-      distanceMeters:
-        getNumberFromProperty(data?.properties?.summary?.distance_meters) ??
-        getNumberFromProperty(data?.summary?.distance_meters),
-      durationSeconds:
-        getNumberFromProperty(data?.properties?.summary?.duration_seconds) ??
-        getNumberFromProperty(data?.summary?.duration_seconds),
-      routeId: getStringFromProperty(data?.route_id) || '',
-      safetyScore: getNumberFromProperty(data?.safety_score),
-    };
-  }
-
-  const primaryRoute =
-    Array.isArray(data?.routes) && data.routes.length > 0
-      ? data.routes.find((route: any) => route.is_primary) || data.routes[0]
-      : data;
-
-  const coordinates = extractCoordinatesFromRouteGeometry(
-    primaryRoute?.geometry ?? primaryRoute?.route_geometry ?? primaryRoute?.path ?? data?.geometry
-  );
-
-  if (coordinates.length < 2) {
-    const waypoints = Array.isArray(primaryRoute?.waypoints) ? primaryRoute.waypoints : [];
-    const waypointCoordinates = waypoints
-      .filter((wp: any) => typeof wp?.lon === 'number' && typeof wp?.lat === 'number')
-      .map((wp: any) => [wp.lon, wp.lat] as [number, number]);
-
-    if (waypointCoordinates.length < 2) {
-      return null;
-    }
-
-    return {
-      coordinates: waypointCoordinates,
-      distanceMeters:
-        getNumberFromProperty(primaryRoute?.distance_m) ??
-        getNumberFromProperty(primaryRoute?.distance) ??
-        getNumberFromProperty(data?.distance_m) ??
-        getNumberFromProperty(data?.distance),
-      durationSeconds:
-        getNumberFromProperty(primaryRoute?.duration_s) ??
-        getNumberFromProperty(primaryRoute?.duration) ??
-        getNumberFromProperty(data?.duration_s) ??
-        getNumberFromProperty(data?.duration),
-      routeId:
-        getStringFromProperty(primaryRoute?.route_id) ||
-        getStringFromProperty(data?.route_id) ||
-        '',
-      safetyScore:
-        getNumberFromProperty(primaryRoute?.safety_score) ??
-        getNumberFromProperty(data?.safety_score),
-    };
-  }
-
-  return {
-    coordinates,
-    distanceMeters:
-      getNumberFromProperty(primaryRoute?.distance_m) ??
-      getNumberFromProperty(primaryRoute?.distance) ??
-      getNumberFromProperty(data?.distance_m) ??
-      getNumberFromProperty(data?.distance),
-    durationSeconds:
-      getNumberFromProperty(primaryRoute?.duration_s) ??
-      getNumberFromProperty(primaryRoute?.duration) ??
-      getNumberFromProperty(data?.duration_s) ??
-      getNumberFromProperty(data?.duration),
-    routeId:
-      getStringFromProperty(primaryRoute?.route_id) || getStringFromProperty(data?.route_id) || '',
-    safetyScore:
-      getNumberFromProperty(primaryRoute?.safety_score) ??
-      getNumberFromProperty(data?.safety_score),
-  };
-};
-
 const isValidCoordinatePair = (value: unknown): value is [number, number] =>
   Array.isArray(value) &&
   value.length >= 2 &&
@@ -2313,6 +2228,91 @@ function getStringFromProperty(value: unknown): string | null {
   }
   return null;
 }
+
+const normalizeRoutingResponse = (data: any): NormalizedRoutingResult | null => {
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+
+  if (data?.type === 'FeatureCollection' && Array.isArray(data.features)) {
+    const coordinates = extractCoordinatesFromRouteGeometry(data);
+    if (coordinates.length < 2) {
+      return null;
+    }
+
+    return {
+      coordinates,
+      distanceMeters:
+        getNumberFromProperty(data?.properties?.summary?.distance_meters) ??
+        getNumberFromProperty(data?.summary?.distance_meters),
+      durationSeconds:
+        getNumberFromProperty(data?.properties?.summary?.duration_seconds) ??
+        getNumberFromProperty(data?.summary?.duration_seconds),
+      routeId: getStringFromProperty(data?.route_id) || '',
+      safetyScore: getNumberFromProperty(data?.safety_score),
+    };
+  }
+
+  const primaryRoute =
+    Array.isArray(data?.routes) && data.routes.length > 0
+      ? data.routes.find((route: any) => route.is_primary) || data.routes[0]
+      : data;
+
+  const coordinates = extractCoordinatesFromRouteGeometry(
+    primaryRoute?.geometry ?? primaryRoute?.route_geometry ?? primaryRoute?.path ?? data?.geometry
+  );
+
+  if (coordinates.length < 2) {
+    const waypoints = Array.isArray(primaryRoute?.waypoints) ? primaryRoute.waypoints : [];
+    const waypointCoordinates = waypoints
+      .filter((wp: any) => typeof wp?.lon === 'number' && typeof wp?.lat === 'number')
+      .map((wp: any) => [wp.lon, wp.lat] as [number, number]);
+
+    if (waypointCoordinates.length < 2) {
+      return null;
+    }
+
+    return {
+      coordinates: waypointCoordinates,
+      distanceMeters:
+        getNumberFromProperty(primaryRoute?.distance_m) ??
+        getNumberFromProperty(primaryRoute?.distance) ??
+        getNumberFromProperty(data?.distance_m) ??
+        getNumberFromProperty(data?.distance),
+      durationSeconds:
+        getNumberFromProperty(primaryRoute?.duration_s) ??
+        getNumberFromProperty(primaryRoute?.duration) ??
+        getNumberFromProperty(data?.duration_s) ??
+        getNumberFromProperty(data?.duration),
+      routeId:
+        getStringFromProperty(primaryRoute?.route_id) ||
+        getStringFromProperty(data?.route_id) ||
+        '',
+      safetyScore:
+        getNumberFromProperty(primaryRoute?.safety_score) ??
+        getNumberFromProperty(data?.safety_score),
+    };
+  }
+
+  return {
+    coordinates,
+    distanceMeters:
+      getNumberFromProperty(primaryRoute?.distance_m) ??
+      getNumberFromProperty(primaryRoute?.distance) ??
+      getNumberFromProperty(data?.distance_m) ??
+      getNumberFromProperty(data?.distance),
+    durationSeconds:
+      getNumberFromProperty(primaryRoute?.duration_s) ??
+      getNumberFromProperty(primaryRoute?.duration) ??
+      getNumberFromProperty(data?.duration_s) ??
+      getNumberFromProperty(data?.duration),
+    routeId:
+      getStringFromProperty(primaryRoute?.route_id) || getStringFromProperty(data?.route_id) || '',
+    safetyScore:
+      getNumberFromProperty(primaryRoute?.safety_score) ??
+      getNumberFromProperty(data?.safety_score),
+  };
+};
 
 const buildSelectedRouteSegment = (properties: Record<string, unknown>): SelectedRouteSegment => {
   const featureId = getStringFromProperty(properties.feature_id) || 'feature-0';
