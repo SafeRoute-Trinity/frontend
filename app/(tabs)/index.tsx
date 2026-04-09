@@ -104,6 +104,7 @@ interface SelectedRouteSegment {
 }
 
 const RECENT_DESTINATIONS_STORAGE_KEY = 'recent_destinations_v1';
+const CURRENT_LOCATION_RESULT_ID = 'local-current-location';
 const HIGH_RISK_ALERT_TITLE = 'High-Risk Area Alert';
 const HIGH_RISK_BANNER_MESSAGE = 'You are entering a high-risk area. Please stay alert.';
 const HIGH_RISK_ALERT_RADIUS_METERS = 30;
