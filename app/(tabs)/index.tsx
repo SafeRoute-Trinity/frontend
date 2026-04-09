@@ -3662,7 +3662,7 @@ const Index = () => {
     if (!routeStart && location) {
       setRouteStart([location.longitude, location.latitude]);
     }
-    setRouteEnd(coord)
+    setRouteEnd(coord);
     console.log('[Routing] triggering route request after destination selection', {
       selectedLocation: coord,
     });
