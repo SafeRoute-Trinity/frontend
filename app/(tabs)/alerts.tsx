@@ -201,6 +201,13 @@ const styles = StyleSheet.create({
   loader: {
     marginTop: 12,
   },
+  contactsLoadErrorText: {
+    fontSize: 13,
+    color: '#FCA5A5',
+    textAlign: 'center',
+    lineHeight: 18,
+    marginBottom: 8,
+  },
   noContacts: {
     alignItems: 'center',
     paddingVertical: 24,
@@ -358,6 +365,7 @@ const Alerts = () => {
   const [silentAlert, setSilentAlert] = useState(false);
   const [contacts, setContacts] = useState<ITrustedContact[]>([]);
   const [loadingContacts, setLoadingContacts] = useState(true);
+  const [contactsLoadError, setContactsLoadError] = useState<string | null>(null);
   const [countdown, setCountdown] = useState(COUNTDOWN_SECONDS);
   const [locationPermission, setLocationPermission] = useState<boolean | null>(null);
   const [userLocation, setUserLocation] = useState<{
@@ -384,7 +392,7 @@ const Alerts = () => {
         const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         setUserLocation({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
       } catch (err) {
-        console.error('Failed to get location:', err);
+        console.log('Failed to get location for SOS:', err);
       }
     } else {
       setLocationPermission(false);
@@ -428,11 +436,19 @@ const Alerts = () => {
 
       (async () => {
         try {
-          setLoadingContacts(true);
-          const res = await fetchTrustedContacts(userId);
-          if (!cancelled) setContacts(res.data ?? []);
+          if (contacts.length === 0) setLoadingContacts(true);
+          setContactsLoadError(null);
+          const res = await fetchTrustedContacts(userId, 1, 1);
+          if (!cancelled) {
+            setContacts(res.data ?? []);
+          }
         } catch (err) {
-          console.error('Failed to load contacts for SOS:', err);
+          if (!cancelled && contacts.length === 0) {
+            setContactsLoadError(
+              'Unable to load trusted contacts right now. You can manage contacts in the Contacts tab and try again.'
+            );
+          }
+          console.log('Failed to load contacts for SOS:', err);
         } finally {
           if (!cancelled) setLoadingContacts(false);
         }
@@ -745,6 +761,9 @@ const Alerts = () => {
             </View>
 
             {loadingContacts && <ActivityIndicator color={colors.accent} style={styles.loader} />}
+            {!loadingContacts && contactsLoadError && (
+              <Text style={styles.contactsLoadErrorText}>{contactsLoadError}</Text>
+            )}
             {!loadingContacts && !primaryContact && (
               <View style={styles.noContacts}>
                 <Ionicons name="person-add-outline" size={28} color={colors.textMuted} />

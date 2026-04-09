@@ -23,7 +23,7 @@ const LOCAL_ENDPOINTS: CoreEndpoints = {
 };
 
 const PUBLIC_ENDPOINTS: CoreEndpoints = {
-  backendBaseUrl: 'https://api.saferoute.app',
+  backendBaseUrl: 'https://saferoutemap.duckdns.org',
   userManagementHealthUrl: 'https://saferoutemap.duckdns.org/health/user-management',
   notificationServiceHealthUrl: 'https://saferoutemap.duckdns.org/health/notification',
   routingServiceHealthUrl: 'https://saferoutemap.duckdns.org/health/routing',
@@ -47,7 +47,7 @@ const pickValue = (envValue: string | undefined, fallbackValue: string): string 
 };
 
 export const coreEndpoints: CoreEndpoints = {
-  backendBaseUrl: pickValue(process.env.EXPO_PUBLIC_BACKEND_URL, profileDefaults.backendBaseUrl),
+  backendBaseUrl: pickValue(process.env.EXPO_PUBLIC_API_URL, profileDefaults.backendBaseUrl),
   userManagementHealthUrl: pickValue(
     process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL,
     profileDefaults.userManagementHealthUrl

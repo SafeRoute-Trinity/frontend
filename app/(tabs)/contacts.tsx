@@ -139,17 +139,18 @@ const Contacts = () => {
   const loadContacts = useCallback(async () => {
     if (!userId) return;
     try {
-      setIsLoading(true);
+      // Only show full loading spinner on first load (no cached data yet)
+      if (contacts.length === 0) setIsLoading(true);
       setError(null);
       const response = await fetchTrustedContacts(userId);
       setContacts(response.data);
     } catch (err: any) {
-      console.error('Failed to load contacts:', err);
-      setError(err.message || 'Failed to load contacts');
+      console.log('Failed to load contacts:', err);
+      if (contacts.length === 0) setError(err.message || 'Failed to load contacts');
     } finally {
       setIsLoading(false);
     }
-  }, [userId]);
+  }, [userId, contacts.length]);
 
   // Reload contacts every time the tab comes into focus (e.g. after adding a new one)
   useFocusEffect(
