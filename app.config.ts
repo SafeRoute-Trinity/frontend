@@ -1,4 +1,5 @@
 import type { ExpoConfig } from 'expo/config';
+const { API_PROFILE, coreEndpoints } = require('./config/core-endpoints.ts') as typeof import('./config/core-endpoints');
 
 // Auth0 configuration - get from environment variables or use defaults
 const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferouteapp.eu.auth0.com';

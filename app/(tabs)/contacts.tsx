@@ -146,7 +146,7 @@ const Contacts = () => {
       setContacts(response.data);
     } catch (err: any) {
       console.log('Failed to load contacts:', err);
-      if (contacts.length === 0) setError(err.message || 'Failed to load contacts');
+      setError(err.message || 'Failed to load contacts');
     } finally {
       setIsLoading(false);
     }
