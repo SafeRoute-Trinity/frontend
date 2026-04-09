@@ -17,6 +17,20 @@ import GradientBackground from '../../components/ui/GradientBackground';
 import { API_URL } from '../../config/api';
 import { InputFocus, InputFocusType } from '../../constants/routes';
 import { colors } from '../../constants/theme';
+import { useAuth0 } from '../../contexts/Auth0Context';
+
+type RecaptchaRef = { open: () => void };
+
+const recaptchaModule: { default?: any } | null = (() => {
+  try {
+    return require('react-native-recaptcha-that-works');
+  } catch {
+    return null;
+  }
+})();
+
+const RecaptchaView = recaptchaModule?.default ?? null;
+const IS_RECAPTCHA_AVAILABLE = Boolean(RecaptchaView);
 
 type RecaptchaRef = { open: () => void };
 
@@ -290,6 +304,8 @@ const Help = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          user_id: user?.sub?.replace(/^auth0\|/, ''),
+          email: user?.email,
           content: feedbackText.trim(),
           privacy_accepted: privacyAccepted,
           captcha_token: recaptchaToken,

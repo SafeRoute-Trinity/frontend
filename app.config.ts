@@ -82,19 +82,11 @@ const config: ExpoConfig = {
     eas: {
       projectId: '30887207-a650-4dbc-a2d8-44c74ad412ad',
     },
-    apiProfile: API_PROFILE,
-    apiBaseUrl: coreEndpoints.backendBaseUrl,
-    userManagementHealthUrl:
-      coreEndpoints.userManagementHealthUrl || process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL,
-    notificationServiceHealthUrl:
-      coreEndpoints.notificationServiceHealthUrl ||
-      process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL,
-    routingServiceHealthUrl:
-      coreEndpoints.routingServiceHealthUrl || process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL,
-    feedbackServiceHealthUrl:
-      coreEndpoints.feedbackServiceHealthUrl ||
-      process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL,
-    sosServiceHealthUrl: coreEndpoints.sosServiceHealthUrl || process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL,
+    userManagementHealthUrl: process.env.EXPO_PUBLIC_USER_MANAGEMENT_HEALTH_URL,
+    notificationServiceHealthUrl: process.env.EXPO_PUBLIC_NOTIFICATION_SERVICE_HEALTH_URL,
+    routingServiceHealthUrl: process.env.EXPO_PUBLIC_ROUTING_SERVICE_HEALTH_URL,
+    feedbackServiceHealthUrl: process.env.EXPO_PUBLIC_FEEDBACK_SERVICE_HEALTH_URL,
+    sosServiceHealthUrl: process.env.EXPO_PUBLIC_SOS_SERVICE_HEALTH_URL,
     mapboxAccessToken: process.env.EXPO_PUBLIC_MAPBOX_ACCESS_TOKEN,
   },
 };
