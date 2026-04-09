@@ -14,7 +14,10 @@ const ACCESS_TOKEN_KEY = 'auth0_access_token';
 // Get API base URL from environment or use default
 const API_BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl ||
+  Constants.expoConfig?.extra?.backendBaseUrl ||
   coreEndpoints.backendBaseUrl ||
+  process.env.EXPO_PUBLIC_BACKEND_URL ||
+  process.env.EXPO_PUBLIC_API_BASE_URL ||
   process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:20000';
 
