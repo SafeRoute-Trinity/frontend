@@ -43,8 +43,60 @@ if (MAPBOX_ACCESS_TOKEN) {
 const FEEDBACK_SUBMIT_URL =
   coreEndpoints.feedbackSubmitUrl || 'http://127.0.0.1:20004/v1/feedback/submit';
 
-const ROUTE_API_URL = 'http://10.0.2.2:20002/v1/routes/calculate';
-const USE_V1_ROUTE_API = true;
+const ensureHttpsForRemote = (url: string) => {
+  if (url.startsWith('http://localhost') || url.startsWith('http://127.0.0.1')) {
+    return url;
+  }
+  return url.replace(/^http:\/\//, 'https://');
+};
+
+const getServiceBaseUrlFromHealthUrl = (healthUrl: string) => {
+  const normalized = ensureHttpsForRemote(healthUrl).replace(/\/$/, '');
+  return normalized.replace(/\/health(?:\/[^/]+)?$/, '');
+};
+
+const buildRouteApiUrlFromHealth = (healthUrl?: string) => {
+  if (!healthUrl) {
+    return null;
+  }
+  const baseUrl = getServiceBaseUrlFromHealthUrl(healthUrl);
+  return `${baseUrl}/v1/routes/calculate`;
+};
+
+const buildTransitApiUrlFromHealth = (healthUrl?: string) => {
+  if (!healthUrl) {
+    return null;
+  }
+  const baseUrl = getServiceBaseUrlFromHealthUrl(healthUrl);
+  return `${baseUrl}/v1/transit/plan`;
+};
+
+const routingHealthUrl = coreEndpoints.routingServiceHealthUrl;
+const derivedRoutingCalculateUrl = buildRouteApiUrlFromHealth(routingHealthUrl);
+const derivedTransitPlanUrl = buildTransitApiUrlFromHealth(routingHealthUrl);
+
+const ROUTE_API_URL =
+  derivedRoutingCalculateUrl ||
+  (coreEndpoints.backendBaseUrl
+    ? `${ensureHttpsForRemote(coreEndpoints.backendBaseUrl).replace(/\/$/, '')}/v1/routes/calculate`
+    : 'https://saferoutemap.duckdns.org/api/route');
+// const USE_V1_ROUTE_API = ROUTE_API_URL.includes('/v1/routes/calculate');
+const buildTransitApiCandidates = () => {
+  const backendTransitUrl = coreEndpoints.backendBaseUrl
+    ? `${ensureHttpsForRemote(coreEndpoints.backendBaseUrl).replace(/\/$/, '')}/v1/transit/plan`
+    : null;
+
+  const candidates = [
+    'https://saferoutemap.duckdns.org/v1/transit/plan',
+    coreEndpoints.transitPlanUrl,
+    derivedTransitPlanUrl,
+    backendTransitUrl,
+  ].filter((item): item is string => Boolean(item));
+
+  return Array.from(new Set(candidates));
+};
+
+// const TRANSIT_API_CANDIDATES = buildTransitApiCandidates();
 
 interface LocationData {
   latitude: number;
@@ -776,6 +828,27 @@ const styles = StyleSheet.create({
   },
   routeSwitchButtonDisabled: {
     opacity: 0.6,
+  },
+  clearRouteButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 2.5,
+    elevation: 4,
+  },
+  clearRouteButtonText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#64748B',
+    lineHeight: 18,
   },
   routeSwitchButtonIcon: {
     fontSize: 20,
@@ -3262,11 +3335,7 @@ const Index = () => {
 
         console.warn('[HighRiskAlert] failed to check current location', error);
         setIsHighRiskArea(false);
-        setHighRiskStatusText(
-          error instanceof Error
-            ? error.message
-            : 'High-risk monitoring is temporarily unavailable.'
-        );
+        // setHighRiskStatusText('Monitoring unavailable.');
         setIsCheckingHighRisk(false);
       }
     };
@@ -3428,7 +3497,6 @@ const Index = () => {
       };
 
       if (transportMode === 'public_transit') {
-        setSelectedTransportMode('walking');
         await fetchAndSetWalkingRoute();
         setRouteError('Public Transit is temporarily unavailable. Showing walking route instead.');
       } else {
@@ -3545,8 +3613,12 @@ const Index = () => {
     });
 
     if (mode === 'public_transit') {
-      setSelectedTransportMode('walking');
-      setRouteError('Public Transit is temporarily unavailable.');
+      setSelectedTransportMode('public_transit');
+      if (routeEnd) {
+        handleGetRoute(routeEnd, 'public_transit').catch((error) => {
+          console.warn('Failed to get route for transit mode', error);
+        });
+      }
       return;
     }
 
@@ -3592,6 +3664,22 @@ const Index = () => {
     handleGetRoute(nextEnd, selectedTransportMode, nextStart).catch((error) => {
       console.warn('Failed to swap start and destination', error);
     });
+  };
+
+  const handleClearRoute = () => {
+    setRouteData(null);
+    setRouteEnd(null);
+    setDestQuery('');
+    setRouteError(null);
+    setTransitItinerary(null);
+    setSelectedRouteSegment(null);
+    setIsNavigationMode(false);
+    isNavigationModeRef.current = false;
+    if (location) {
+      const coord: [number, number] = [location.longitude, location.latitude];
+      setRouteStart(coord);
+      setStartQuery('Current Location');
+    }
   };
 
   const handleSelectLocation = async (result: SearchResult) => {
@@ -3841,7 +3929,7 @@ const Index = () => {
     )
   );
   const transitJourneySteps = buildTransitJourneySteps(transitItinerary);
-  const hasPlannedRoute = Boolean(routeData || transitItinerary);
+  const hasPlannedRoute = Boolean(routeData || transitItinerary || routeEnd);
   const shouldShowOnlyRouteEndpoints = Boolean(routeStart && routeEnd);
   const isMapInteractionLocked =
     isDestinationOverlayVisible || isMapPointModalVisible || showReportModal;
@@ -4251,29 +4339,39 @@ const Index = () => {
                 (isLoadingRoute || !routeStart || !routeEnd) && styles.routeSwitchButtonDisabled,
               ]}
               onPress={handleSwapRouteEndpoints}
-              disabled={isLoadingRoute || !routeStart || !routeEnd}
+              disabled={isLoadingRoute}
             >
               <Text style={styles.routeSwitchButtonIcon}>⇅</Text>
             </Pressable>
+            <Pressable style={styles.clearRouteButton} onPress={handleClearRoute}>
+              <Text style={styles.clearRouteButtonText}>✕</Text>
+            </Pressable>
           </View>
         ) : (
-          <Pressable
-            style={styles.destinationTrigger}
-            onPress={() => openDestinationOverlay('destination')}
-          >
-            <View style={styles.destinationTriggerContent}>
-              <Text style={styles.searchIcon}>🏁</Text>
-              <Text
-                numberOfLines={1}
-                style={[
-                  styles.destinationTriggerText,
-                  !destQuery && styles.destinationTriggerPlaceholder,
-                ]}
-              >
-                {destQuery || 'Search destination in Dublin'}
-              </Text>
-            </View>
-          </Pressable>
+          <View style={styles.routeInputsRow}>
+            <Pressable
+              style={[styles.destinationTrigger, styles.routeInputsCardMain]}
+              onPress={() => openDestinationOverlay('destination')}
+            >
+              <View style={styles.destinationTriggerContent}>
+                <Text style={styles.searchIcon}>🏁</Text>
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    styles.destinationTriggerText,
+                    !destQuery && styles.destinationTriggerPlaceholder,
+                  ]}
+                >
+                  {destQuery || 'Search destination in Dublin'}
+                </Text>
+              </View>
+            </Pressable>
+            {destQuery ? (
+              <Pressable style={styles.clearRouteButton} onPress={handleClearRoute}>
+                <Text style={styles.clearRouteButtonText}>✕</Text>
+              </Pressable>
+            ) : null}
+          </View>
         )}
       </View>
 
@@ -4298,11 +4396,20 @@ const Index = () => {
                 </Text>
               </Pressable>
               <Pressable
-                disabled
-                style={[styles.transportModeButton, { opacity: 0.45 }]}
+                style={[
+                  styles.transportModeButton,
+                  selectedTransportMode === 'public_transit' && styles.transportModeButtonActive,
+                ]}
                 onPress={() => handleTransportModeChange('public_transit')}
               >
-                <Text style={styles.transportModeButtonText}>Public Transit</Text>
+                <Text
+                  style={[
+                    styles.transportModeButtonText,
+                    selectedTransportMode === 'public_transit' && styles.transportModeButtonTextActive,
+                  ]}
+                >
+                  Public Transit
+                </Text>
               </Pressable>
             </View>
 
