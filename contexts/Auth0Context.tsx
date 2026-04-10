@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { apiClient, AUTH_KEYS } from '../api/client';
-import { auth0Config } from '../config/auth0';
+import { auth0Config, getAuth0 } from '../config/auth0';
 
 import { storage } from '../utils/storage';
 
