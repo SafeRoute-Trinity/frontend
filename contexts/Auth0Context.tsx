@@ -107,6 +107,10 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       // settings, so we store it as the token used for all backend API calls.
       // The access_token is only used directly for Auth0's own /userinfo endpoint.
       const backendToken = credentials.id_token || credentials.access_token;
+      console.log('🔑 id_token present:', !!credentials.id_token);
+      console.log('🔑 access_token present:', !!credentials.access_token);
+      console.log('🔑 Using for backend:', credentials.id_token ? 'id_token' : 'access_token');
+      console.log('🔑 Token prefix (first 20):', backendToken?.substring(0, 20));
       if (backendToken) {
         await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, backendToken);
         console.log(

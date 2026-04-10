@@ -79,7 +79,7 @@ const ROUTE_API_URL =
   derivedRoutingCalculateUrl ||
   (coreEndpoints.backendBaseUrl
     ? `${ensureHttpsForRemote(coreEndpoints.backendBaseUrl).replace(/\/$/, '')}/v1/routes/calculate`
-    : 'https://saferoutemap.duckdns.org/api/route');
+    : 'https://saferoutemap.duckdns.org/v1/routes/calculate');
 // const USE_V1_ROUTE_API = ROUTE_API_URL.includes('/v1/routes/calculate');
 const buildTransitApiCandidates = () => {
   const backendTransitUrl = coreEndpoints.backendBaseUrl
