@@ -96,7 +96,11 @@ const buildTransitApiCandidates = () => {
   return Array.from(new Set(candidates));
 };
 
-// const TRANSIT_API_CANDIDATES = buildTransitApiCandidates();
+// All candidate URLs to try in order (primary nginx proxy first, then direct service port)
+const TRANSIT_API_CANDIDATES: string[] = [
+  ...buildTransitApiCandidates(),
+  'https://saferoutemap.duckdns.org/v1/transit/plan',
+];
 
 interface LocationData {
   latitude: number;
@@ -3497,9 +3501,90 @@ const Index = () => {
         setRouteData(nextRouteData);
       };
 
+      const fetchAndSetTransitRoute = async () => {
+        const payload = {
+          origin: { lat: startCoord[1], lon: startCoord[0] },
+          destination: { lat: endCoord[1], lon: endCoord[0] },
+          departure_time: new Date().toISOString(),
+          max_walking_distance_m: 1200,
+          max_transfers: 4,
+          search_window_minutes: 180,
+        };
+
+        let lastError: string = 'Transit API unavailable';
+        let data: TransitPlanResponse | null = null;
+
+        // Try each candidate URL in order — nginx may block some paths
+        for (const candidateUrl of TRANSIT_API_CANDIDATES) {
+          console.log('[Transit] trying URL', candidateUrl);
+          try {
+            const response = await fetch(candidateUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload),
+            });
+
+            console.log('[Transit] response status', response.status, 'from', candidateUrl);
+
+            // Safe-parse: avoid crash when server returns HTML (e.g. nginx 404)
+            const rawText = await response.text();
+            const parsed = (() => {
+              try {
+                return JSON.parse(rawText);
+              } catch {
+                return null;
+              }
+            })();
+
+            if (!response.ok || parsed === null) {
+              const detail = parsed?.detail ?? parsed?.message ?? `HTTP ${response.status}`;
+              console.warn('[Transit] candidate failed', candidateUrl, detail);
+              lastError = detail;
+              continue; // try next candidate
+            }
+
+            data = parsed as TransitPlanResponse;
+            break; // success
+          } catch (fetchErr) {
+            console.warn('[Transit] fetch error for', candidateUrl, fetchErr);
+            lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+            // continue to next candidate
+          }
+        }
+
+        if (data === null) {
+          throw new Error(`Transit unavailable: ${lastError}`);
+        }
+
+        const itineraries = data?.itineraries ?? [];
+        if (itineraries.length === 0) {
+          console.warn('[Transit] no itineraries returned, falling back to walking');
+          await fetchAndSetWalkingRoute();
+          setRouteError('No public transit found for this journey. Showing walking route instead.');
+          return;
+        }
+
+        const firstItinerary = itineraries[0];
+        console.log('[Transit] received itinerary', {
+          legs: firstItinerary.legs.length,
+          duration_s: firstItinerary.duration_s,
+          transfers: firstItinerary.transfers,
+        });
+
+        setTransitItinerary(firstItinerary);
+
+        const featureCollection = createTransitFeatureCollectionFromItinerary(firstItinerary);
+        if (featureCollection) {
+          setRouteData(featureCollection);
+        } else {
+          console.warn('[Transit] no leg coordinates, falling back to walking route');
+          await fetchAndSetWalkingRoute();
+          setRouteError('Transit route has no geometry. Showing walking route instead.');
+        }
+      };
+
       if (transportMode === 'public_transit') {
-        await fetchAndSetWalkingRoute();
-        setRouteError('Public Transit is temporarily unavailable. Showing walking route instead.');
+        await fetchAndSetTransitRoute();
       } else {
         await fetchAndSetWalkingRoute();
       }
@@ -4408,7 +4493,8 @@ const Index = () => {
                 <Text
                   style={[
                     styles.transportModeButtonText,
-                    selectedTransportMode === 'public_transit' && styles.transportModeButtonTextActive,
+                    selectedTransportMode === 'public_transit' &&
+                      styles.transportModeButtonTextActive,
                   ]}
                 >
                   Public Transit
