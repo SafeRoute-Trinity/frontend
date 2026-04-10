@@ -284,7 +284,10 @@ const PersonalInfo = () => {
                       await logout();
                       router.replace('/login');
                     } catch (err: any) {
-                      Alert.alert('Error', err?.message ?? 'Failed to delete account. Please try again.');
+                      Alert.alert(
+                        'Error',
+                        err?.message ?? 'Failed to delete account. Please try again.'
+                      );
                     } finally {
                       setIsDeletingAccount(false);
                     }
