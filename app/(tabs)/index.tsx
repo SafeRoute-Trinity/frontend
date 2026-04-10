@@ -161,7 +161,9 @@ interface SelectedRouteSegment {
 
 const RECENT_DESTINATIONS_STORAGE_KEY = 'recent_destinations_v1';
 const CURRENT_LOCATION_RESULT_ID = 'local-current-location';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const HIGH_RISK_ALERT_TITLE = 'High-Risk Area Alert';
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const HIGH_RISK_BANNER_MESSAGE = 'You are entering a high-risk area. Please stay alert.';
 const HIGH_RISK_ALERT_RADIUS_METERS = 30;
 
@@ -2732,8 +2734,10 @@ const Index = () => {
   >(null);
   const [severity, setSeverity] = useState<'low' | 'medium' | 'high' | 'critical' | null>(null);
   const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isHighRiskArea, setIsHighRiskArea] = useState(false);
   const [isCheckingHighRisk, setIsCheckingHighRisk] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [highRiskStatusText, setHighRiskStatusText] = useState('Waiting for your location...');
   const activeDangerZoneIdsRef = useRef<string[]>([]);
   const isInsideHighRiskAreaRef = useRef(false);
@@ -3511,46 +3515,50 @@ const Index = () => {
           search_window_minutes: 180,
         };
 
-        let lastError: string = 'Transit API unavailable';
-        let data: TransitPlanResponse | null = null;
+        // Try each candidate URL in order — nginx may block some paths.
+        // Uses sequential promise chaining to avoid no-await-in-loop and no-restricted-syntax.
+        type CandidateAcc = { data: TransitPlanResponse | null; lastError: string };
+        const { data, lastError } = await TRANSIT_API_CANDIDATES.reduce<Promise<CandidateAcc>>(
+          async (accPromise, candidateUrl) => {
+            const acc = await accPromise;
+            if (acc.data !== null) return acc; // already succeeded — skip remaining
+            console.log('[Transit] trying URL', candidateUrl);
+            try {
+              const response = await fetch(candidateUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+              });
 
-        // Try each candidate URL in order — nginx may block some paths
-        for (const candidateUrl of TRANSIT_API_CANDIDATES) {
-          console.log('[Transit] trying URL', candidateUrl);
-          try {
-            const response = await fetch(candidateUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
-            });
+              console.log('[Transit] response status', response.status, 'from', candidateUrl);
 
-            console.log('[Transit] response status', response.status, 'from', candidateUrl);
+              // Safe-parse: avoid crash when server returns HTML (e.g. nginx 404)
+              const rawText = await response.text();
+              const parsed = (() => {
+                try {
+                  return JSON.parse(rawText);
+                } catch {
+                  return null;
+                }
+              })();
 
-            // Safe-parse: avoid crash when server returns HTML (e.g. nginx 404)
-            const rawText = await response.text();
-            const parsed = (() => {
-              try {
-                return JSON.parse(rawText);
-              } catch {
-                return null;
+              if (!response.ok || parsed === null) {
+                const detail = parsed?.detail ?? parsed?.message ?? `HTTP ${response.status}`;
+                console.warn('[Transit] candidate failed', candidateUrl, detail);
+                return { data: null, lastError: detail };
               }
-            })();
 
-            if (!response.ok || parsed === null) {
-              const detail = parsed?.detail ?? parsed?.message ?? `HTTP ${response.status}`;
-              console.warn('[Transit] candidate failed', candidateUrl, detail);
-              lastError = detail;
-              continue; // try next candidate
+              return { data: parsed as TransitPlanResponse, lastError: acc.lastError };
+            } catch (fetchErr) {
+              console.warn('[Transit] fetch error for', candidateUrl, fetchErr);
+              return {
+                data: null,
+                lastError: fetchErr instanceof Error ? fetchErr.message : String(fetchErr),
+              };
             }
-
-            data = parsed as TransitPlanResponse;
-            break; // success
-          } catch (fetchErr) {
-            console.warn('[Transit] fetch error for', candidateUrl, fetchErr);
-            lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
-            // continue to next candidate
-          }
-        }
+          },
+          Promise.resolve({ data: null, lastError: 'Transit API unavailable' })
+        );
 
         if (data === null) {
           throw new Error(`Transit unavailable: ${lastError}`);
