@@ -1,5 +1,5 @@
 /* eslint-disable no-console */
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { apiClient, AUTH_KEYS } from '../api/client';
 import { auth0Config } from '../config/auth0';
 
@@ -128,13 +128,23 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setUser(userInfo);
       await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
 
-      // VERIFICATION: Verify backend connection by calling a protected endpoint
-      console.log('🔍 Verified Backend Connection: Calling /v1/users/me...');
+      // Trigger auto-create: if the user doesn't exist in our DB yet, /v1/users/me
+      // will create them from Auth0 /userinfo. We check response.ok so a real
+      // failure (non-network) is visible in logs.
+      console.log('🔍 Syncing user with backend via /v1/users/me...');
       try {
-        await apiClient.get('/v1/users/me');
-        console.log('✅ Backend verification successful!');
+        const meRes = await apiClient.get('/v1/users/me');
+        if (meRes.ok) {
+          console.log('✅ Backend user sync successful!');
+        } else {
+          console.error(
+            '❌ Backend user sync failed:',
+            meRes.status,
+            await meRes.text().catch(() => '')
+          );
+        }
       } catch (backendErr) {
-        console.error('❌ Backend verification failed:', backendErr);
+        console.error('❌ Backend user sync network error:', backendErr);
       }
 
       console.log('✅ Native login complete! User:', userInfo.email || userInfo.sub);
@@ -151,13 +161,17 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   const login = async (showSignup: boolean = false, forceLogin: boolean = false) => {
     const _showSignup = showSignup;
     const _forceLogin = forceLogin;
-    setError(new Error('WebAuth login is disabled in this build. Use nativeLogin(email, password).'));
-    console.warn('WebAuth login is disabled in this build', { showSignup: _showSignup, forceLogin: _forceLogin });
+    setError(
+      new Error('WebAuth login is disabled in this build. Use nativeLogin(email, password).')
+    );
+    console.warn('WebAuth login is disabled in this build', {
+      showSignup: _showSignup,
+      forceLogin: _forceLogin,
+    });
   };
 
   const clearSession = async () => {
     // No-op: we intentionally avoid native webAuth bridge calls in this build.
-    return;
   };
 
   const logout = async () => {
@@ -182,16 +196,19 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const value: Auth0ContextType = {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    nativeLogin,
-    logout,
-    clearSession,
-    error,
-  };
+  const value: Auth0ContextType = useMemo(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login,
+      nativeLogin,
+      logout,
+      clearSession,
+      error,
+    }),
+    [user, isLoading, error] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   return <Auth0Context.Provider value={value}>{children}</Auth0Context.Provider>;
 };
