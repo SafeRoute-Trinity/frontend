@@ -100,17 +100,24 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       const credentials = await response.json();
       console.log('✅ Native login successful! Tokens received');
 
-      // Save tokens
-      if (credentials.access_token) {
+      // Save tokens.
+      // We store the id_token (not the access_token) for backend API calls because
+      // the access_token may be issued for the Management API audience depending on
+      // Auth0 application settings, making it unusable with /userinfo. The id_token
+      // is always a verifiable RS256 JWT regardless of audience configuration.
+      if (credentials.id_token) {
+        await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.id_token);
+        console.log('💾 ID token saved for backend auth');
+      } else if (credentials.access_token) {
         await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.access_token);
-        console.log('💾 Access token saved');
+        console.log('💾 Access token saved (no id_token present)');
       }
       if (credentials.refresh_token) {
         await storage.setItem(AUTH_KEYS.REFRESH_TOKEN, credentials.refresh_token);
         console.log('💾 Refresh token saved');
       }
 
-      // Get user information from Auth0
+      // Get user information from Auth0 using the access_token directly
       console.log('🔍 Fetching user info from Auth0...');
       const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
         headers: {
@@ -128,17 +135,16 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setUser(userInfo);
       await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
 
-      // Trigger auto-create: if the user doesn't exist in our DB yet, /v1/users/me
-      // will create them from Auth0 /userinfo. Use the fresh token directly rather
-      // than reading it back from SecureStore, to avoid any silent write-failure
-      // causing a stale token to be sent.
+      // Trigger auto-create: send the id_token directly so the backend can verify
+      // it via JWKS without needing to call Auth0's /userinfo.
+      const backendToken = credentials.id_token || credentials.access_token;
       console.log('🔍 Syncing user with backend via /v1/users/me...');
       try {
         const meRes = await apiClient.fetch('/v1/users/me', {
           method: 'GET',
           skipAuth: true,
           headers: {
-            Authorization: `Bearer ${credentials.access_token}`,
+            Authorization: `Bearer ${backendToken}`,
           },
         });
         if (meRes.ok) {
