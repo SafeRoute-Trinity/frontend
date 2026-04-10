@@ -129,11 +129,18 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
 
       // Trigger auto-create: if the user doesn't exist in our DB yet, /v1/users/me
-      // will create them from Auth0 /userinfo. We check response.ok so a real
-      // failure (non-network) is visible in logs.
+      // will create them from Auth0 /userinfo. Use the fresh token directly rather
+      // than reading it back from SecureStore, to avoid any silent write-failure
+      // causing a stale token to be sent.
       console.log('🔍 Syncing user with backend via /v1/users/me...');
       try {
-        const meRes = await apiClient.get('/v1/users/me');
+        const meRes = await apiClient.fetch('/v1/users/me', {
+          method: 'GET',
+          skipAuth: true,
+          headers: {
+            Authorization: `Bearer ${credentials.access_token}`,
+          },
+        });
         if (meRes.ok) {
           console.log('✅ Backend user sync successful!');
         } else {
