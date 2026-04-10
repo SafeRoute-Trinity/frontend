@@ -1,7 +1,7 @@
 import type { ExpoConfig } from 'expo/config';
 
 // Auth0 configuration - get from environment variables or use defaults
-const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferoute.eu.auth0.com';
+const AUTH0_DOMAIN = process.env.EXPO_PUBLIC_AUTH0_DOMAIN || 'saferouteapp.eu.auth0.com';
 const AUTH0_SCHEME = 'saferouteapp';
 
 const config: ExpoConfig = {

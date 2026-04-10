@@ -4,7 +4,10 @@ import { storage } from '../utils/storage';
 
 export const AUTH_KEYS = {
   USER: 'auth0_user',
+  /** Access token (Auth0 /userinfo, refresh flows). */
   ACCESS_TOKEN: 'auth0_access_token',
+  /** ID token — send to SafeRoute backend (Bearer); aud matches native client_id. */
+  ID_TOKEN: 'auth0_id_token',
   REFRESH_TOKEN: 'auth0_refresh_token',
 };
 
@@ -33,12 +36,14 @@ export const apiClient = {
 
     // Add Auth Headers unless skipped
     if (!options.skipAuth) {
+      const idToken = await storage.getItem(AUTH_KEYS.ID_TOKEN);
       const accessToken = await storage.getItem(AUTH_KEYS.ACCESS_TOKEN);
+      const bearer = idToken || accessToken;
 
       const deviceId = await getDeviceId();
 
-      if (accessToken) {
-        headers.set('Authorization', `Bearer ${accessToken}`);
+      if (bearer) {
+        headers.set('Authorization', `Bearer ${bearer}`);
       }
       if (deviceId) {
         headers.set('X-Device-Id', deviceId);

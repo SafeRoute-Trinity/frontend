@@ -72,7 +72,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
           client_id: auth0Config.clientId,
           scope: 'openid profile email offline_access',
           realm: 'Username-Password-Authentication', // Specify database connection
-          audience: 'https://saferouteapp.eu.auth0.com/api/v2/', // Add audience to get JWT tokens
+          // No audience: access_token stays suitable for /userinfo; id_token is the JWT the backend verifies.
         }),
       });
 
@@ -95,7 +95,11 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       const credentials = await response.json();
       console.log('✅ Native login successful! Tokens received');
 
-      // Save tokens
+      // Save tokens (backend expects id_token; access_token is for Auth0 userinfo / refresh)
+      if (credentials.id_token) {
+        await storage.setItem(AUTH_KEYS.ID_TOKEN, credentials.id_token);
+        console.log('💾 ID token saved (API auth)');
+      }
       if (credentials.access_token) {
         await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.access_token);
         console.log('💾 Access token saved');
@@ -201,6 +205,10 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       console.log('✅ Authorization completed! Credentials received');
 
       // Save tokens
+      if (credentials.idToken) {
+        await storage.setItem(AUTH_KEYS.ID_TOKEN, credentials.idToken);
+        console.log('💾 ID token saved (API auth)');
+      }
       if (credentials.accessToken) {
         await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.accessToken);
         console.log('💾 Access token saved');
@@ -259,6 +267,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
 
       // 1. Clear stored tokens and user data
       await storage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+      await storage.removeItem(AUTH_KEYS.ID_TOKEN);
       await storage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
       await storage.removeItem(AUTH_KEYS.USER);
       // 2. Clear user state - this will trigger UI update
