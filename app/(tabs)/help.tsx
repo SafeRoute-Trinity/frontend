@@ -29,11 +29,11 @@ const recaptchaModule: { default?: any } | null = (() => {
   }
 })();
 
-const RecaptchaView = recaptchaModule?.default ?? null;
-const IS_RECAPTCHA_AVAILABLE = Boolean(RecaptchaView);
+// Falls back to '' if the EAS secret is not set — treated as unavailable below.
+const RECAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY ?? '';
 
-// TODO: Replace with your actual reCAPTCHA v2 site key from https://www.google.com/recaptcha/admin
-const RECAPTCHA_SITE_KEY = process.env.EXPO_PUBLIC_RECAPTCHA_SITE_KEY!;
+const RecaptchaView = recaptchaModule?.default ?? null;
+const IS_RECAPTCHA_AVAILABLE = Boolean(RecaptchaView) && Boolean(RECAPTCHA_SITE_KEY);
 
 interface IHelpMenuItem {
   icon: keyof typeof Ionicons.glyphMap;
@@ -268,7 +268,7 @@ const Help = () => {
   );
 
   const handleOpenTerms = () => {
-    Linking.openURL(`${API_URL}/terms`);
+    Linking.openURL('https://saferoute-privacy-site.vercel.app/');
   };
 
   const handleAppInfo = () => {
@@ -494,7 +494,7 @@ const Help = () => {
                   I read and accept the{' '}
                   <Text
                     style={styles.checkboxLink}
-                    onPress={() => Linking.openURL(`${API_URL}/terms`)}
+                    onPress={() => Linking.openURL('https://saferoute-privacy-site.vercel.app/')}
                   >
                     privacy policy
                   </Text>

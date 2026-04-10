@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { apiClient } from '../../api/client';
 import GradientBackground from '../../components/ui/GradientBackground';
 import { Routes } from '../../constants/routes';
 import { colors } from '../../constants/theme';
@@ -156,6 +158,41 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  dangerZone: {
+    paddingHorizontal: 20,
+    marginTop: 32,
+    marginBottom: 8,
+  },
+  dangerZoneTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#EF4444',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 12,
+  },
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    paddingVertical: 16,
+  },
+  deleteButtonPressed: {
+    backgroundColor: 'rgba(239, 68, 68, 0.22)',
+  },
+  deleteButtonDisabled: {
+    opacity: 0.5,
+  },
+  deleteButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#EF4444',
+  },
 });
 
 const InfoField = ({ label, value, editable, onChangeText }: IInfoField) => (
@@ -176,10 +213,11 @@ const InfoField = ({ label, value, editable, onChangeText }: IInfoField) => (
 
 const PersonalInfo = () => {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading: authLoading } = useAuth0();
+  const { user, isAuthenticated, isLoading: authLoading, logout } = useAuth0();
   const [name, setName] = useState<string | undefined>(undefined);
   const [phone, setPhone] = useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -211,6 +249,56 @@ const PersonalInfo = () => {
     });
     // TODO: Implement actual save logic
     setIsSaving(false);
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'Are you sure you want to permanently delete your account? This will remove all your data and cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Final Confirmation',
+              'This is permanent. Your account, routes, and data will be deleted immediately.',
+              [
+                { text: 'Go Back', style: 'cancel' },
+                {
+                  text: 'Yes, Delete My Account',
+                  style: 'destructive',
+                  onPress: async () => {
+                    if (!user?.sub) return;
+                    setIsDeletingAccount(true);
+                    try {
+                      const encodedId = encodeURIComponent(user.sub);
+                      const response = await apiClient.fetch(`/v1/users/${encodedId}`, {
+                        method: 'DELETE',
+                      });
+                      if (!response.ok && response.status !== 204) {
+                        const body = await response.json().catch(() => ({}));
+                        throw new Error(body?.detail ?? `Delete failed (${response.status})`);
+                      }
+                      await logout();
+                      router.replace('/login');
+                    } catch (err: any) {
+                      Alert.alert(
+                        'Error',
+                        err?.message ?? 'Failed to delete account. Please try again.'
+                      );
+                    } finally {
+                      setIsDeletingAccount(false);
+                    }
+                  },
+                },
+              ]
+            );
+          },
+        },
+      ]
+    );
   };
 
   if (authLoading) {
@@ -281,6 +369,30 @@ const PersonalInfo = () => {
           <View style={styles.accountIdContainer}>
             <Text style={styles.accountIdLabel}>Account ID</Text>
             <Text style={styles.accountIdValue}>{user.sub?.replace(/^auth0\|/, '')}</Text>
+          </View>
+
+          {/* Danger Zone */}
+          <View style={styles.dangerZone}>
+            <Text style={styles.dangerZoneTitle}>Danger Zone</Text>
+            <Pressable
+              id="delete-account-button"
+              style={({ pressed }) => [
+                styles.deleteButton,
+                pressed && styles.deleteButtonPressed,
+                isDeletingAccount && styles.deleteButtonDisabled,
+              ]}
+              onPress={handleDeleteAccount}
+              disabled={isDeletingAccount}
+            >
+              {isDeletingAccount ? (
+                <ActivityIndicator size="small" color="#EF4444" />
+              ) : (
+                <Ionicons name="trash-outline" size={18} color="#EF4444" />
+              )}
+              <Text style={styles.deleteButtonText}>
+                {isDeletingAccount ? 'Deleting…' : 'Delete Account'}
+              </Text>
+            </Pressable>
           </View>
         </ScrollView>
 

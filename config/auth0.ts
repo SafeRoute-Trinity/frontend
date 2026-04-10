@@ -77,9 +77,7 @@ const initializeAuth0 = (): any => {
 };
 
 // Export a getter function that lazily initializes Auth0
-export const getAuth0 = () => {
-  return initializeAuth0();
-};
+export const getAuth0 = () => initializeAuth0();
 
 // For backward compatibility, export auth0 as a getter
 // Avoid Proxy-based lazy access because property introspection can
