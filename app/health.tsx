@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { API_PROFILE } from '../config/core-endpoints';
 
 type ServiceStatusState = 'idle' | 'checking' | 'ok' | 'error' | 'skipped';
 
@@ -474,7 +475,8 @@ const Health = () => {
           <View style={styles.headerLeft}>
             <Text style={styles.title}>SafeRoute Connectivity</Text>
             <Text style={styles.subtitle}>
-              Quick health snapshot across critical platform services.
+              Quick health snapshot across critical platform services. Profile:{' '}
+              {API_PROFILE.toUpperCase()}
             </Text>
           </View>
           <Pressable
@@ -504,9 +506,7 @@ const Health = () => {
         {lastCheckedAt ? (
           <Text style={styles.lastChecked}>Last checked: {lastCheckedAt.toLocaleTimeString()}</Text>
         ) : (
-          <Text style={styles.lastChecked}>
-            Configure the EXPO_PUBLIC_* environment variables to enable checks.
-          </Text>
+          <Text style={styles.lastChecked}>Profile is {API_PROFILE.toUpperCase()}.</Text>
         )}
       </View>
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>

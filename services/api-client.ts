@@ -7,13 +7,18 @@
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
+import { coreEndpoints } from '../config/core-endpoints';
 
 import { AUTH_KEYS } from '../api/client';
 
 // Get API base URL from environment or use default
 const API_BASE_URL =
   Constants.expoConfig?.extra?.apiBaseUrl ||
+  Constants.expoConfig?.extra?.backendBaseUrl ||
+  coreEndpoints.backendBaseUrl ||
+  process.env.EXPO_PUBLIC_BACKEND_URL ||
   process.env.EXPO_PUBLIC_API_BASE_URL ||
+  process.env.EXPO_PUBLIC_API_URL ||
   'http://localhost:20000';
 
 /**
@@ -79,23 +84,16 @@ export const apiRequest = async (
   }
 
   const url = `${API_BASE_URL}${endpoint}`;
+  const response = await fetch(url, {
+    ...options,
+    headers,
+  });
 
-  try {
-    const response = await fetch(url, {
-      ...options,
-      headers,
-    });
-
-    if (!response.ok) {
-      throw new ApiError(`API request failed with status ${response.status}`, response.status);
-    }
-
-    return response;
-  } catch (error) {
-    // Log unexpected errors with context before rethrowing
-    // console.error(`Request to ${url} failed:`, error);
-    throw error;
+  if (!response.ok) {
+    throw new ApiError(`API request failed with status ${response.status}`, response.status);
   }
+
+  return response;
 };
 
 /**

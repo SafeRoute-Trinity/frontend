@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
-import React, { createContext, ReactNode, useContext, useEffect, useState } from 'react';
+import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { apiClient, AUTH_KEYS } from '../api/client';
-import { auth0Config, getAuth0 } from '../config/auth0';
+import { auth0Config } from '../config/auth0';
 
 import { storage } from '../utils/storage';
 
@@ -60,6 +60,19 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       console.log('🔍 Starting native login with email:', email);
 
       // Call Auth0 OAuth token endpoint with Resource Owner Password Grant
+      const requestBody: Record<string, string> = {
+        grant_type: 'password',
+        username: email.trim(),
+        password,
+        client_id: auth0Config.clientId,
+        scope: 'openid profile email offline_access',
+        realm: 'Username-Password-Authentication',
+      };
+
+      if (auth0Config.audience) {
+        requestBody.audience = auth0Config.audience;
+      }
+
       const response = await fetch(`https://${auth0Config.domain}/oauth/token`, {
         method: 'POST',
         headers: {
@@ -102,14 +115,14 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       }
       if (credentials.access_token) {
         await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.access_token);
-        console.log('💾 Access token saved');
+        console.log('💾 Access token saved (no id_token present)');
       }
       if (credentials.refresh_token) {
         await storage.setItem(AUTH_KEYS.REFRESH_TOKEN, credentials.refresh_token);
         console.log('💾 Refresh token saved');
       }
 
-      // Get user information from Auth0
+      // Get user information from Auth0 using the access_token directly
       console.log('🔍 Fetching user info from Auth0...');
       const userInfoResponse = await fetch(`https://${auth0Config.domain}/userinfo`, {
         headers: {
@@ -127,13 +140,29 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       setUser(userInfo);
       await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
 
-      // VERIFICATION: Verify backend connection by calling a protected endpoint
-      console.log('🔍 Verified Backend Connection: Calling /v1/users/me...');
+      // Trigger auto-create: send the id_token directly so the backend can verify
+      // it via JWKS without needing to call Auth0's /userinfo.
+      const backendToken = credentials.id_token || credentials.access_token;
+      console.log('🔍 Syncing user with backend via /v1/users/me...');
       try {
-        await apiClient.get('/v1/users/me');
-        console.log('✅ Backend verification successful!');
+        const meRes = await apiClient.fetch('/v1/users/me', {
+          method: 'GET',
+          skipAuth: true,
+          headers: {
+            Authorization: `Bearer ${backendToken}`,
+          },
+        });
+        if (meRes.ok) {
+          console.log('✅ Backend user sync successful!');
+        } else {
+          console.error(
+            '❌ Backend user sync failed:',
+            meRes.status,
+            await meRes.text().catch(() => '')
+          );
+        }
       } catch (backendErr) {
-        console.error('❌ Backend verification failed:', backendErr);
+        console.error('❌ Backend user sync network error:', backendErr);
       }
 
       console.log('✅ Native login complete! User:', userInfo.email || userInfo.sub);
@@ -250,14 +279,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   };
 
   const clearSession = async () => {
-    try {
-      const auth0 = getAuth0();
-      if (auth0) {
-        await auth0.webAuth.clearSession();
-      }
-    } catch (err) {
-      console.error('Clear session error:', err);
-    }
+    // No-op: we intentionally avoid native webAuth bridge calls in this build.
   };
 
   const logout = async () => {
@@ -283,16 +305,19 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const value: Auth0ContextType = {
-    user,
-    isLoading,
-    isAuthenticated: !!user,
-    login,
-    nativeLogin,
-    logout,
-    clearSession,
-    error,
-  };
+  const value: Auth0ContextType = useMemo(
+    () => ({
+      user,
+      isLoading,
+      isAuthenticated: !!user,
+      login,
+      nativeLogin,
+      logout,
+      clearSession,
+      error,
+    }),
+    [user, isLoading, error] // eslint-disable-line react-hooks/exhaustive-deps
+  );
 
   return <Auth0Context.Provider value={value}>{children}</Auth0Context.Provider>;
 };
