@@ -9,7 +9,7 @@ import * as SecureStore from 'expo-secure-store';
 import { Platform } from 'react-native';
 import { coreEndpoints } from '../config/core-endpoints';
 
-const ACCESS_TOKEN_KEY = 'auth0_access_token';
+import { AUTH_KEYS } from '../api/client';
 
 // Get API base URL from environment or use default
 const API_BASE_URL =
@@ -38,14 +38,20 @@ export class ApiError extends Error {
  * Get stored access token from secure storage
  * @returns {Promise<string | null>} The access token or null if not found
  */
-const getAccessToken = async (): Promise<string | null> => {
+const getBearerToken = async (): Promise<string | null> => {
   if (Platform.OS === 'web') {
-    return localStorage.getItem(ACCESS_TOKEN_KEY);
+    return (
+      localStorage.getItem(AUTH_KEYS.ID_TOKEN) ||
+      localStorage.getItem(AUTH_KEYS.ACCESS_TOKEN)
+    );
   }
   try {
-    return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-  } catch {
-    // Ignore storage read failures and continue unauthenticated.
+    const id = await SecureStore.getItemAsync(AUTH_KEYS.ID_TOKEN);
+    if (id) {
+      return id;
+    }
+    return await SecureStore.getItemAsync(AUTH_KEYS.ACCESS_TOKEN);
+  } catch (error) {
     return null;
   }
 };
@@ -65,7 +71,7 @@ export const apiRequest = async (
   endpoint: string,
   options: RequestOptions = {}
 ): Promise<Response> => {
-  const token = await getAccessToken();
+  const token = await getBearerToken();
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

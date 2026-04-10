@@ -1,7 +1,7 @@
 /* eslint-disable no-console */
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react';
 import { apiClient, AUTH_KEYS } from '../api/client';
-import { auth0Config } from '../config/auth0';
+import { auth0Config, getAuth0 } from '../config/auth0';
 
 import { storage } from '../utils/storage';
 
@@ -78,7 +78,15 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(requestBody),
+        body: JSON.stringify({
+          grant_type: 'password',
+          username: email.trim(),
+          password,
+          client_id: auth0Config.clientId,
+          scope: 'openid profile email offline_access',
+          realm: 'Username-Password-Authentication', // Specify database connection
+          // No audience: access_token stays suitable for /userinfo; id_token is the JWT the backend verifies.
+        }),
       });
 
       if (!response.ok) {
@@ -100,15 +108,12 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
       const credentials = await response.json();
       console.log('✅ Native login successful! Tokens received');
 
-      // Save tokens.
-      // We store the id_token (not the access_token) for backend API calls because
-      // the access_token may be issued for the Management API audience depending on
-      // Auth0 application settings, making it unusable with /userinfo. The id_token
-      // is always a verifiable RS256 JWT regardless of audience configuration.
+      // Save tokens (backend expects id_token; access_token is for Auth0 userinfo / refresh)
       if (credentials.id_token) {
-        await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.id_token);
-        console.log('💾 ID token saved for backend auth');
-      } else if (credentials.access_token) {
+        await storage.setItem(AUTH_KEYS.ID_TOKEN, credentials.id_token);
+        console.log('💾 ID token saved (API auth)');
+      }
+      if (credentials.access_token) {
         await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.access_token);
         console.log('💾 Access token saved (no id_token present)');
       }
@@ -172,15 +177,105 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
   };
 
   const login = async (showSignup: boolean = false, forceLogin: boolean = false) => {
-    const _showSignup = showSignup;
-    const _forceLogin = forceLogin;
-    setError(
-      new Error('WebAuth login is disabled in this build. Use nativeLogin(email, password).')
-    );
-    console.warn('WebAuth login is disabled in this build', {
-      showSignup: _showSignup,
-      forceLogin: _forceLogin,
-    });
+    try {
+      setError(null);
+      setIsLoading(true);
+
+      console.log('🔍 Starting login process...', { showSignup, forceLogin });
+
+      const auth0 = getAuth0();
+      if (!auth0) {
+        throw new Error(
+          'Auth0 native module is not available. Please rebuild the app with: npx expo prebuild && npx expo run:ios'
+        );
+      }
+
+      const redirectUri = 'saferouteapp://auth/callback';
+
+      console.log('🔍 Calling auth0.webAuth.authorize with:', {
+        scope: 'openid profile email offline_access',
+        redirectUri,
+        prompt: 'login',
+        showSignup,
+      });
+
+      // Add timeout to detect if WebView fails to load
+      const authorizePromise = auth0.webAuth.authorize({
+        // Type definitions don't include redirectUri, but the runtime library expects it.
+        // eslint-disable-next-line @typescript-eslint/consistent-type-assertions
+        ...({
+          scope: 'openid profile email offline_access',
+          redirectUri,
+          ...(showSignup
+            ? {
+                screen_hint: 'signup',
+                // Additional metadata for signup - these will be available in Auth0 Actions
+                login_hint: 'Please provide your full name and ensure passwords match',
+              }
+            : {}),
+          // Always prompt for login to avoid consent screen with cached sessions
+          prompt: 'login',
+        } as any),
+      });
+
+      // Wait for 5 seconds to see if WebView loads
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => {
+          console.log('⏳ 5 seconds elapsed - WebView might be stuck on blank page');
+        }, 5000);
+      });
+
+      // Race between authorize and timeout (just for logging, won't actually timeout)
+      Promise.race([authorizePromise, timeoutPromise]).catch(() => {});
+
+      // Use Auth0 webAuth for login or signup
+      const credentials = await authorizePromise;
+
+      console.log('✅ Authorization completed! Credentials received');
+
+      // Save tokens
+      if (credentials.idToken) {
+        await storage.setItem(AUTH_KEYS.ID_TOKEN, credentials.idToken);
+        console.log('💾 ID token saved (API auth)');
+      }
+      if (credentials.accessToken) {
+        await storage.setItem(AUTH_KEYS.ACCESS_TOKEN, credentials.accessToken);
+        console.log('💾 Access token saved');
+      }
+      if (credentials.refreshToken) {
+        await storage.setItem(AUTH_KEYS.REFRESH_TOKEN, credentials.refreshToken);
+        console.log('💾 Refresh token saved');
+      }
+
+      console.log('🔍 Fetching user info...');
+      // Get user information
+      const userInfo = await auth0.auth.userInfo({
+        token: credentials.accessToken,
+      });
+
+      console.log('✅ User info received:', { email: userInfo.email, sub: userInfo.sub });
+
+      setUser(userInfo);
+      await storage.setItem(AUTH_KEYS.USER, JSON.stringify(userInfo));
+
+      console.log('✅ Login successful! User:', userInfo.email || userInfo.sub);
+    } catch (err: any) {
+      // User cancellation is not considered an error
+      if (err.error !== 'a0.session.user_cancelled') {
+        setError(err);
+        console.error('❌ Login error:', err);
+
+        // Provide helpful error message for blank page issue
+        if (err.message && err.message.includes('network')) {
+          console.error('💡 Network error detected. Please check emulator internet connection.');
+        }
+      } else {
+        console.log('ℹ️ User cancelled login');
+      }
+    } finally {
+      setIsLoading(false);
+      console.log('🔍 Login process finished');
+    }
   };
 
   const clearSession = async () => {
@@ -194,6 +289,7 @@ export const Auth0Provider = ({ children }: { children: ReactNode }) => {
 
       // 1. Clear stored tokens and user data
       await storage.removeItem(AUTH_KEYS.ACCESS_TOKEN);
+      await storage.removeItem(AUTH_KEYS.ID_TOKEN);
       await storage.removeItem(AUTH_KEYS.REFRESH_TOKEN);
       await storage.removeItem(AUTH_KEYS.USER);
       // 2. Clear user state - this will trigger UI update
